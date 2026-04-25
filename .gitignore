@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+*.egg-info/
+dist/
+build/
+.ipynb_checkpoints/
+
+# Not for GitHub — local-only assets
+ws-photos/
+references/
+*.pptx
+*.docx
+build_manuscript.py
