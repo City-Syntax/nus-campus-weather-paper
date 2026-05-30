@@ -4,10 +4,13 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-from matplotlib.colors import Normalize
+from matplotlib.colors import Normalize, LinearSegmentedColormap
 from matplotlib.cm import ScalarMappable
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from matplotlib.patches import Circle
+import warnings
+warnings.filterwarnings('ignore')
 import glob, os, calendar
 
 # ── Style ─────────────────────────────────────────────────────────────────────
@@ -36,6 +39,29 @@ VARS = [
 
 PRESSURE_OUTLIER = "WS17"
 R_IN,  R_OUT = 0.30, 0.90    # inner / outer radius of data ring
+
+GAUGE_STATIONS = ['WS02', 'WS16', 'WS35']
+
+T_INNER_REF  = 18.0      # °C anchor for inner ring
+T_OUTER_REF  = 42.0      # °C anchor for outer ring
+R_INNER_BASE = 0.8       # radial units
+R_OUTER_BASE = 3.0
+SOLAR_VMIN   = 100       # W/m² colormap low clip
+SOLAR_VMAX   = 550       # W/m² colormap high clip
+RH_THRESHOLD = 82        # % — blobs only above this RH
+RAIN_MIN     = 0.5       # mm — blobs only above this rainfall
+
+SOLAR_CMAP = LinearSegmentedColormap.from_list(
+    'solar', ['#fff3a0', '#ffee00', '#ff8c00', '#ff0000', '#8b0000'], N=256)
+SOLAR_NORM = Normalize(vmin=SOLAR_VMIN, vmax=SOLAR_VMAX)
+
+RAIN_COLOR = '#4a90d9'
+RH_COLOR   = '#9b59b6'
+
+MONTH_NAMES   = ['JAN','FEB','MAR','APR','MAY','JUN',
+                 'JUL','AUG','SEP','OCT','NOV','DEC']
+MONTH_MID_DOY = [16, 46, 74, 106, 136, 167, 197, 228, 259, 289, 320, 350]
+MONTH_STARTS  = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
 
 # ── Load ──────────────────────────────────────────────────────────────────────
 FILES = sorted(glob.glob(os.path.join(ROOT, "data", "raw", "NUS_CAMPUS_WS*.csv")))
@@ -67,6 +93,10 @@ def doy_to_theta(doy):
 def to_radius(val, vmin, vmax):
     frac = np.clip((np.asarray(val, float) - vmin) / (vmax - vmin), 0, 1)
     return frac * (R_OUT - R_IN) + R_IN
+
+def temp_to_r(T):
+    """Map temperature (°C) to radial position."""
+    return R_INNER_BASE + (T - T_INNER_REF) / (T_OUTER_REF - T_INNER_REF) * (R_OUTER_BASE - R_INNER_BASE)
 
 def setup_polar(ax):
     ax.set_theta_zero_location("N")
@@ -218,7 +248,7 @@ def draw_radial(ax, doy, hour, val, vmin, vmax, lc,
     tc = np.linspace(0, 2 * np.pi, 360)
     ax.fill(tc, np.full(360, R_IN), color="white", zorder=5)
 
-# ── Per-variable plot config for Fig 6a ──────────────────────────────────────
+# ── Per-variable plot config for Fig 9 ──────────────────────────────────────
 # keys: center, line_label, has_band, show_mean, daytime_only
 VAR_CFG = {
     "AirTemp Ave (C)": dict(
@@ -253,7 +283,7 @@ VAR_CFG = {
     ),
 }
 
-# Mean line colors for Fig 6a: dark end of each variable's own colormap
+# Mean line colors for Fig 9: dark end of each variable's own colormap
 MEAN_COLORS_6A = {
     "AirTemp Ave (C)":       "#bd0026",   # YlOrRd dark red
     "RelHum Ave (%)":        "#225ea8",   # YlGnBu deep blue
@@ -263,13 +293,225 @@ MEAN_COLORS_6A = {
 }
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Fig 6a — Option A: 6 radials, network mean, all variables
+# Fig 5 — Combined weather radial plot
 # ═════════════════════════════════════════════════════════════════════════════
-print("Building Fig 6a (Option A — network radials)...")
+R_20 = temp_to_r(20)
+R_35 = temp_to_r(35)
 
-fig6a, axs6a = plt.subplots(2, 3, figsize=(18, 13),
+combineddf = all_df.copy()
+combineddf['Datetime'] = pd.to_datetime(combineddf['Datetime'])
+combineddf['Date']     = combineddf['Datetime'].dt.date
+combineddf['Hour']     = combineddf['Datetime'].dt.hour
+
+# Rooftop: 8 stations — temperature & solar
+roof     = combineddf[(combineddf['Type'] == 'Roof') | (combineddf['Type'] == 'Roof-3axis')]
+hourly_r = roof.groupby(['Date','Hour']).agg(
+    AirTemp=('AirTemp Ave (C)','mean'), GlobalRad=('GlobalRad Ave (W/m2)','mean')).reset_index()
+daily_rt = hourly_r.groupby('Date').agg(
+    temp_max=('AirTemp','max'), temp_min=('AirTemp','min')).reset_index()
+solar_r  = (hourly_r[hourly_r['Hour'].between(7,19)]
+            .groupby('Date')['GlobalRad'].mean().rename('solar_day'))
+daily_rt = daily_rt.merge(solar_r, on='Date')
+
+# Rain: mean of 3 gauge stations
+dfs_rain = {}
+GAUGE_PATH = ROOT+'/data/imputed/NUS_CAMPUS_{ws}_2025_Hourly_imputed.csv'
+for ws in GAUGE_STATIONS:
+    d = pd.read_csv(GAUGE_PATH.format(ws=ws))
+    d['Datetime'] = pd.to_datetime(d['Datetime'])
+    d['Date']     = d['Datetime'].dt.date
+    dfs_rain[ws]  = d
+rain_avg = (pd.concat([d.groupby('Date')['Rain Tot (mm)'].sum().rename(ws)
+                        for ws, d in dfs_rain.items()], axis=1)
+              .mean(axis=1).rename('rain'))
+
+daily_roof = daily_rt.merge(rain_avg, on='Date')
+daily_roof['Date'] = pd.to_datetime(daily_roof['Date'])
+daily_roof = daily_roof.sort_values('Date').reset_index(drop=True)
+
+# Ground: 32 stations — temperature, solar, RH
+ground   = combineddf[combineddf['Type'] == 'Ground']
+hourly_g = ground.groupby(['Date','Hour']).agg(
+    AirTemp=('AirTemp Ave (C)','mean'), RelHum=('RelHum Ave (%)','mean'),
+    GlobalRad=('GlobalRad Ave (W/m2)','mean')).reset_index()
+daily_gnd = hourly_g.groupby('Date').agg(
+    temp_max=('AirTemp','max'), temp_min=('AirTemp','min'),
+    rh_mean=('RelHum','mean')).reset_index()
+solar_gnd = (hourly_g[hourly_g['Hour'].between(7,19)]
+             .groupby('Date')['GlobalRad'].mean().rename('solar_day'))
+daily_gnd = daily_gnd.merge(solar_gnd, on='Date')
+daily_gnd['Date'] = pd.to_datetime(daily_gnd['Date'])
+daily_gnd = daily_gnd.sort_values('Date').reset_index(drop=True)
+
+# ── BLOB FUNCTIONS ────────────────────────────────────────────────────────────
+RAIN_MAX   = daily_roof['rain'].max()
+RH_MAX_VAL = daily_gnd['rh_mean'].max()
+
+def rain_to_blob(r):
+    return 0.0 if r < RAIN_MIN else 0.04 + 0.32 * (r / RAIN_MAX)
+
+def rh_to_blob(rh):
+    if rh < RH_THRESHOLD: return 0.0
+    return 0.04 + 0.32 * ((rh - RH_THRESHOLD) / (RH_MAX_VAL - RH_THRESHOLD))
+
+# ── RADIAL DRAW FUNCTION ──────────────────────────────────────────────────────
+N      = 365
+ANGLES = np.linspace(0, 2*np.pi, N, endpoint=False)
+
+def draw_radial_combined(ax, daily, blob_col, blob_fn, blob_color, panel_label):
+    ax.set_theta_zero_location('N')
+    ax.set_theta_direction(-1)
+
+    r_min = np.clip(temp_to_r(daily['temp_min'].values), R_INNER_BASE, R_OUTER_BASE)
+    r_max = np.clip(temp_to_r(daily['temp_max'].values), R_INNER_BASE, R_OUTER_BASE)
+
+    # temperature reference rings
+    for T, lbl in [(20,'20°C'),(25,'25°C'),(30,'30°C'),(35,'35°C')]:
+        r = temp_to_r(T)
+        ax.plot(np.linspace(0,2*np.pi,500), [r]*500,
+                color='#aaaaaa', linewidth=1.4, linestyle=(0,(4,3)), zorder=1)
+        ax.text(np.radians(197), r, lbl, color='#888888', fontsize=14,
+                ha='center', va='center', fontweight='bold', zorder=2)
+
+    # daily temperature lines coloured by solar radiation
+    for i, row in daily.iterrows():
+        c = SOLAR_CMAP(SOLAR_NORM(row['solar_day']))
+        ax.plot([ANGLES[i], ANGLES[i]], [r_min[i], r_max[i]],
+                color=c, linewidth=2.0, alpha=0.92, solid_capstyle='round', zorder=3)
+
+    # blob markers
+    for i, row in daily.iterrows():
+        rb = blob_fn(row[blob_col])
+        if rb > 0:
+            r_mid = (r_min[i] + r_max[i]) / 2
+            x = r_mid * np.cos(np.pi/2 - ANGLES[i])
+            y = r_mid * np.sin(np.pi/2 - ANGLES[i])
+            ax.add_patch(Circle((x, y), rb, color=blob_color, alpha=0.30,
+                                zorder=4, transform=ax.transData._b))
+
+    # month separator lines: from inside 20°C ring to outside 35°C ring
+    for doy in MONTH_STARTS:
+        idx = min(doy-1, N-1)
+        ax.plot([ANGLES[idx], ANGLES[idx]], [R_20 - 0.12, R_35 + 0.12],
+                color='#bbbbbb', linewidth=0.8, zorder=2)
+
+    ax.set_ylim(0, R_OUTER_BASE + 0.65)
+    ax.set_yticks([]); ax.set_xticks([])
+    ax.spines['polar'].set_visible(False)
+    ax.text(0, 0, panel_label, color='#444444', fontsize=16,
+            fontweight='bold', ha='center', va='center')
+
+def add_month_labels_combined(fig, ax, label_r, fontsize=18):
+    """Place month labels using display-space transform for correct rotation."""
+    for doy, mname in zip(MONTH_MID_DOY, MONTH_NAMES):
+        idx        = min(doy-1, N-1)
+        t_m        = ANGLES[idx]
+        xy_disp    = ax.transData.transform((t_m, label_r))
+        cx, cy     = ax.transData.transform((0, 0))
+        dx, dy     = xy_disp[0]-cx, xy_disp[1]-cy
+        disp_angle = np.degrees(np.arctan2(dy, dx))
+        rot        = disp_angle - 90
+        if dy < 0:
+            rot += 180
+        xy_fig = fig.transFigure.inverted().transform(xy_disp)
+        fig.text(xy_fig[0], xy_fig[1], mname,
+                 color='#333333', fontsize=fontsize, fontweight='bold',
+                 ha='center', va='center', rotation=rot)
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Fig 5: Combined weather radial (two-panel chart)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+print("Building Fig 5 (combined weather radial)...")
+
+fig = plt.figure(figsize=(24, 13), facecolor='white')
+
+ax1 = fig.add_axes([0.03, 0.08, 0.43, 0.82], polar=True, facecolor='white')
+ax2 = fig.add_axes([0.44, 0.08, 0.43, 0.82], polar=True, facecolor='white')
+draw_radial_combined(ax1, daily_gnd,  'rh_mean', rh_to_blob, RH_COLOR,
+            'GROUND LEVEL\n32 STATIONS\n(avg)')
+draw_radial_combined(ax2, daily_roof, 'rain', rain_to_blob, RAIN_COLOR,
+            'ROOFTOP\n8 STATIONS\n(avg)')
+
+fig.canvas.draw()
+label_r = R_35 + 0.30
+add_month_labels_combined(fig, ax1, label_r, fontsize=18)
+add_month_labels_combined(fig, ax2, label_r, fontsize=18)
+
+# solar colorbar
+sm = ScalarMappable(cmap=SOLAR_CMAP, norm=SOLAR_NORM)
+sm.set_array([])
+cbar_ax = fig.add_axes([0.85, 0.23, 0.012, 0.54])
+cbar    = fig.colorbar(sm, cax=cbar_ax)
+# cbar    = fig.colorbar(sm, location="right")
+cbar.set_ticks([100,200,300,400,500])
+cbar.set_ticklabels(['100','200','300','400','500+'])
+cbar.set_label('Daytime mean solar (07–19h) (W/m²)', color='#444444',
+               fontsize=18, labelpad=10)
+cbar.ax.yaxis.set_tick_params(color='#666666')
+plt.setp(cbar.ax.yaxis.get_ticklabels(), color='#444444', fontsize=12)
+cbar.outline.set_edgecolor('#cccccc')
+
+# titles
+fig.text(0.50, 0.855,
+         'WEATHER RADIAL  ·  NUS KENT RIDGE CAMPUS  ·  2025',
+         color='#222222', fontsize=18, fontweight='bold', ha='center', va='top')
+fig.text(0.50, 0.826,
+         'Line = daily temp range  ·  Colour = daytime solar radiation (07–19h)  ·  Blob = rainfall (left) / relative humidity >82% (right)',
+         color='#888888', fontsize=12, ha='center', va='top')
+
+rain_entries = [(rain_to_blob(5),  '5 mm'),
+                (rain_to_blob(20), '20 mm'),
+                (rain_to_blob(40), '40 mm'),
+                (rain_to_blob(80), '80 mm')]
+rh_entries   = [(rh_to_blob(83),  '83%'),
+                (rh_to_blob(87),  '87%'),
+                (rh_to_blob(91),  '91%'),
+                (rh_to_blob(95),  '95%')]
+
+def draw_blob_legend(ax, entries, color, title, unit_label):
+    ax.set_facecolor('white')
+    ax.set_aspect('equal')
+    ax.axis('off')
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1)
+    max_b     = max(rb for rb, _ in entries)
+    scale     = 0.25 / max_b
+    ys        = np.linspace(0.82, 0.12, len(entries))
+    cx        = 0.22
+    for (rb, lbl), y in zip(entries, ys):
+        ax.add_patch(Circle((cx, y), rb*0.9, color=color, alpha=0.30,
+                                zorder=4, transform=ax.transData._b))
+        ax.text(cx + max_b * scale + 0.25, y, lbl,
+                color='#333333', fontsize=10, va='center', ha='left')
+    ax.text(0.50, 0.97, title, color='#222222', fontsize=12,
+            ha='center', va='top', fontweight='bold')
+    ax.text(0.50, 0.90, unit_label, color='#888888', fontsize=8,
+            ha='center', va='top')
+
+    rect = plt.Rectangle((0.02,0.02), 0.96, 0.96,
+                          fill=False, edgecolor='#dddddd', linewidth=0.8,
+                          transform=ax.transAxes)
+    ax.add_patch(rect)
+
+blobax1 = fig.add_axes([0.03, 0.16, 0.0825, 0.25], facecolor='white')
+blobax2 = fig.add_axes([0.435, 0.16, 0.0825, 0.25], facecolor='white')
+draw_blob_legend(blobax1, rh_entries,  RH_COLOR,
+                 'REL. HUMIDITY','daily mean (%)')
+draw_blob_legend(blobax2, rain_entries, RAIN_COLOR,
+                 'RAINFALL',     'daily total (mm)')
+
+OUT_CHART  = ROOT+'/figures/Fig5_Combined_WeatherRadial.png'
+plt.savefig(OUT_CHART, dpi=200, bbox_inches='tight', facecolor='white')
+plt.close()
+print(f"  Saved: {OUT_CHART}")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Fig 9 — Option A: 6 radials, network mean, all variables
+# ═════════════════════════════════════════════════════════════════════════════
+print("Building Fig 9 (Option A — network radials)...")
+
+fig9, axs6a = plt.subplots(2, 3, figsize=(18, 13),
                               subplot_kw={"projection": "polar"})
-fig6a.patch.set_facecolor("white")
+fig9.patch.set_facecolor("white")
 
 for ax, (col, label, unit, lc) in zip(axs6a.flat, VARS):
     cfg = VAR_CFG[col]
@@ -327,8 +569,8 @@ for ax, (col, label, unit, lc) in zip(axs6a.flat, VARS):
 # Shared hour-of-day colorbar
 sm_h = ScalarMappable(cmap=HOUR_CMAP, norm=Normalize(vmin=0, vmax=23))
 sm_h.set_array([])
-cax_a = fig6a.add_axes([0.93, 0.14, 0.013, 0.72])
-cb_a  = fig6a.colorbar(sm_h, cax=cax_a)
+cax_a = fig9.add_axes([0.93, 0.14, 0.013, 0.72])
+cb_a  = fig9.colorbar(sm_h, cax=cax_a)
 cb_a.set_label("Hour of Day (all panels)", fontsize=8.5, fontfamily=FONT, labelpad=8)
 cb_a.set_ticks([0, 6, 12, 18, 23])
 cb_a.set_ticklabels(["00h", "06h", "12h", "18h", "23h"])
@@ -336,24 +578,24 @@ cb_a.ax.tick_params(labelsize=8)
 for sp in cb_a.ax.spines.values():
     sp.set_linewidth(0.3)
 
-fig6a.suptitle(
+fig9.suptitle(
     "Annual Weather Radials — NUS Campus Meteorological Network (2025)\n"
     "40 stations  ·  Jan at top, clockwise  ·  Dot colour = hour of day  ·  "
     "Radius = variable value  ·  Dashed circles = data min / max",
     fontsize=11, fontfamily=FONT, fontweight="bold", y=1.01
 )
-fig6a.subplots_adjust(left=0.03, right=0.91, top=0.92, bottom=0.05,
+fig9.subplots_adjust(left=0.03, right=0.91, top=0.92, bottom=0.05,
                        hspace=0.18, wspace=0.08)
-out6a = os.path.join(ROOT, "figures", "Fig6a_WeatherRadials_Network.png")
-fig6a.savefig(out6a, dpi=300, bbox_inches="tight")
-print(f"Saved: {out6a}")
-plt.close(fig6a)
+out9 = os.path.join(ROOT, "figures", "Fig9_WeatherRadials_Network.png")
+fig9.savefig(out9, dpi=300, bbox_inches="tight")
+print(f"Saved: {out9}")
+plt.close(fig9)
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Fig 6b — Option B: 40 radials per station, one figure per variable (6 total)
+# Fig 9af — Option B: 40 radials per station, one figure per variable (6 total)
 # ═════════════════════════════════════════════════════════════════════════════
 
-FIG6B_VARS = [
+FIG9A_VARS = [
     dict(col="AirTemp Ave (C)",       label="Air Temperature",   unit="°C",   lc=VAR_COLORS[0],
          fname="AirTemp",   daytime_only=False, excl_ws17=False),
     dict(col="RelHum Ave (%)",        label="Relative Humidity", unit="%",    lc=VAR_COLORS[1],
@@ -371,7 +613,7 @@ FIG6B_VARS = [
 N_COLS, N_ROWS = 8, 5
 MEAN_GREY = "#aaaaaa"
 
-for vcfg in FIG6B_VARS:
+for vcfg in FIG9A_VARS:
     col          = vcfg["col"]
     label        = vcfg["label"]
     unit         = vcfg["unit"]
@@ -380,7 +622,7 @@ for vcfg in FIG6B_VARS:
     is_wind_dir  = (col == "WindDir Ave (degrees)")
     is_solar     = (col == "GlobalRad Ave (W/m2)")
 
-    print(f"Building Fig 6b — {label} (40 stations)...")
+    print(f"Building Fig 9a-f — {label} (40 stations)...")
 
     src = all_df.copy()
     if vcfg["excl_ws17"]:
@@ -397,9 +639,9 @@ for vcfg in FIG6B_VARS:
         vmax_b = float(np.nanpercentile(net_grp[col], 98))
         print(f"  Scale: {vmin_b:.1f}–{vmax_b:.1f} {unit}")
 
-    fig6b, axs6b = plt.subplots(N_ROWS, N_COLS, figsize=(27, 17),
+    fig9af, axs6b = plt.subplots(N_ROWS, N_COLS, figsize=(27, 17),
                                   subplot_kw={"projection": "polar"})
-    fig6b.patch.set_facecolor("white")
+    fig9af.patch.set_facecolor("white")
 
     for ax, ws in zip(axs6b.flat, stations):
         sta_df = src[src["station"] == ws]
@@ -446,7 +688,7 @@ for vcfg in FIG6B_VARS:
             Patch(facecolor=HOUR_CMAP(12 / 23),  alpha=0.88, label="12h (noon)"),
             Patch(facecolor=HOUR_CMAP(18 / 23),  alpha=0.88, label="18h (dusk)"),
         ]
-        fig6b.legend(handles=leg_handles,
+        fig9af.legend(handles=leg_handles,
                      title="Stacked by hour of day", title_fontsize=7.5,
                      loc="lower center", bbox_to_anchor=(0.45, 0.005),
                      fontsize=8, framealpha=0.95, edgecolor="#dddddd",
@@ -460,7 +702,7 @@ for vcfg in FIG6B_VARS:
                    markerfacecolor=HOUR_CMAP(0.5), alpha=0.7, lw=0,
                    label="Dot colour = hour of day"),
         ]
-        fig6b.legend(handles=leg_handles, loc="lower center",
+        fig9af.legend(handles=leg_handles, loc="lower center",
                      bbox_to_anchor=(0.45, 0.005),
                      fontsize=8, framealpha=0.95, edgecolor="#dddddd",
                      fancybox=False, ncol=2, columnspacing=1.2,
@@ -469,8 +711,8 @@ for vcfg in FIG6B_VARS:
     # Shared hour colorbar (applies to all variables)
     sm_b = ScalarMappable(cmap=HOUR_CMAP, norm=Normalize(vmin=0, vmax=23))
     sm_b.set_array([])
-    cax_b = fig6b.add_axes([0.93, 0.10, 0.012, 0.78])
-    cb_b  = fig6b.colorbar(sm_b, cax=cax_b)
+    cax_b = fig9af.add_axes([0.93, 0.10, 0.012, 0.78])
+    cb_b  = fig9af.colorbar(sm_b, cax=cax_b)
     cb_b.set_label("Hour of Day", fontsize=9, fontfamily=FONT, labelpad=8)
     cb_b.set_ticks([0, 6, 12, 18, 23])
     cb_b.set_ticklabels(["00h", "06h", "12h", "18h", "23h"])
@@ -493,16 +735,16 @@ for vcfg in FIG6B_VARS:
                      f"Jan at top, clockwise  ·  Dot colour = hour of day  ·  "
                      f"Radius = {label.lower()}  ·  {scale_str}{sol_note}{ws17_note}")
 
-    fig6b.suptitle(subtitle, fontsize=11, fontfamily=FONT, fontweight="bold", y=1.003)
-    fig6b.subplots_adjust(left=0.02, right=0.91, top=0.97, bottom=0.03,
+    fig9af.suptitle(subtitle, fontsize=11, fontfamily=FONT, fontweight="bold", y=1.003)
+    fig9af.subplots_adjust(left=0.02, right=0.91, top=0.97, bottom=0.03,
                            hspace=0.06, wspace=0.06)
 
     FIG8_LETTERS = {"AirTemp": "a", "WindDir": "b", "RelHum": "c",
                     "WindSpeed": "d", "AtmPress": "e", "SolarRad": "f"}
-    out6b = os.path.join(ROOT, "figures",
-                         f"Fig8{FIG8_LETTERS[fname]}_{fname}_AllStations.png")
-    fig6b.savefig(out6b, dpi=300, bbox_inches="tight")
-    print(f"  Saved: {out6b}")
-    plt.close(fig6b)
+    out9af = os.path.join(ROOT, "figures", "additional_figures",
+                         f"AddFig9{FIG8_LETTERS[fname]}_{fname}_AllStations.png")
+    fig9af.savefig(out9af, dpi=300, bbox_inches="tight")
+    print(f"  Saved: {out9af}")
+    plt.close(fig9af)
 
 print("\nAll radial figures complete.")
