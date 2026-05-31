@@ -1,6 +1,6 @@
 # 🌦️ NUS Campus Meteorological Network — Hourly Dataset (2025)
 
-Hourly meteorological observations from a **40-station automatic weather station (AWS) network** deployed across the National University of Singapore (NUS) main campus for the full calendar year 2025 — to our knowledge, the densest publicly documented campus-scale meteorological network in the world.
+Hourly meteorological observations from a **40-station automatic weather station (AWS) network** deployed across the National University of Singapore (NUS) main campus for the full calendar year 2025 — to our knowledge, the densest publicly documented neighborhood/district-scale meteorological dataset globally.
 
 ---
 
@@ -10,7 +10,8 @@ Hourly meteorological observations from a **40-station automatic weather station
 |---|---|
 | Stations | 40 (WS01–WS40) |
 | Coverage | 1 January – 31 December 2025 (8,760 hourly steps) |
-| Location | NUS main campus, Singapore (1.290°–1.308°N, 103.770°–103.783°E) |
+| Location | NUS main campus, Singapore (≈ 1.30°N, 103.78°E) |
+| Density | 26.7 stations/km² across ~150 hectares |
 | Variables | Air temperature, relative humidity, atmospheric pressure, global solar irradiance, wind speed, wind direction; rainfall at WS02, WS16, WS35 |
 | Temporal resolution | 1 hour |
 | Raw completeness | 99.77% network mean; 34/40 stations at 100% |
@@ -30,26 +31,23 @@ nus-campus-weather-paper/
 │   └── imputed/                         # Gap-filled dataset (40 CSV files + flag columns)
 │       └── NUS_CAMPUS_WS##_2025_Hourly_imputed.csv
 │
-├── figures/                             # All manuscript figures
-│   ├── Fig4_BubbleMap_Completeness.png
-│   ├── Fig5_Heatmap_MonthlyCompleteness.png
-│   ├── Fig6a_WeatherRadials_Network.png
-│   ├── Fig6b_Climatology_DiurnalSeasonal.png
+├── figures/                             # Manuscript figures (10 total — see table below)
+│   ├── Fig4_MonthlyCompleteness.png
+│   ├── Fig6_Climatology_DiurnalSeasonal.png
 │   ├── Fig7_NetworkTimeSeries.png
-│   ├── Fig8a–f_*_AllStations.png        # Per-variable radials, all 40 stations
-│   ├── Fig9_SpatialVariability.png
+│   ├── Fig9a_AirTemp_AllStations.png    # Fig 9 panels — annual radials, all 40 stations
+│   ├── Fig9b_WindDir_AllStations.png
+│   ├── Fig9c_RelHum_AllStations.png
+│   ├── Fig9d_WindSpeed_AllStations.png
+│   ├── Fig9e_AtmPress_AllStations.png
+│   ├── Fig9f_SolarRad_AllStations.png
 │   └── Fig10_Imputation_Examples.{png,pdf}
 │
-├── results/
-│   ├── data_quality_summary.csv         # Per-station completeness statistics
-│   ├── imputation_evaluation.csv        # LOSO cross-validation metrics
-│   └── imputation_plausibility.csv      # Post-imputation physical bounds check
-│
 ├── code/
-│   ├── 1_data_quality_check.py          # Compute completeness → results/
-│   ├── 2_plot_data_completeness.py      # Fig 4, Fig 5
-│   ├── 3_plot_weather_data.py           # Fig 6b, Fig 7, Fig 9
-│   ├── 4_plot_weather_radials.py        # Fig 6a, Fig 8a–f
+│   ├── 1_data_quality_check.py          # Computes completeness → results/
+│   ├── 2_plot_data_completeness.py      # Fig 4
+│   ├── 3_plot_weather_data.py           # Fig 6, Fig 7
+│   ├── 4_plot_weather_radials.py        # Fig 9a–f
 │   ├── 5_impute_missing_data.py         # Gap-filling pipeline + LOSO validation
 │   ├── 6_plot_imputation_examples.py    # Fig 10
 │   └── preprocessing/                   # Historical only — not needed for re-use
@@ -61,6 +59,25 @@ nus-campus-weather-paper/
 ├── LICENSE
 └── README.md
 ```
+
+---
+
+## 📊 Figures (10 total, per the manuscript)
+
+| Fig | Description | File | Status |
+|---|---|---|---|
+| 1 | 40-weather-station network deployed across NUS campus (overview) | — | 🚧 To be added |
+| 2 | Station location map (ground = black, rooftop = red, 3 special rooftop sites = square; forested ridge = green, managed vegetation = pale green) | — | 🚧 To be added |
+| 3 | Typical weather station showing installed sensors and components | — | 🚧 To be added |
+| 4 | Monthly mean per-variable completeness for all 40 stations; topmost row shows the overall annual completeness | `Fig4_MonthlyCompleteness.png` | ⚠ Plot needs the *topmost annual row* added (current version is monthly only) |
+| 5 | Combined weather radials: ground-level (left) vs rooftop (right); air temperature, solar radiation, rainfall and relative humidity layered per day | — | 🚧 To be added |
+| 6 | Diurnal climatology of network-mean meteorological variables (month × hour heatmaps) | `Fig6_Climatology_DiurnalSeasonal.png` | ✅ |
+| 7 | Full-year network time series with inter-station spread (daily-mean T, RH, irradiance) | `Fig7_NetworkTimeSeries.png` | ✅ |
+| 8 | Wind roses for ground-level (left) and rooftop (right) stations overlaid on the campus map; 25 ground + 8 rooftop shown | — | 🚧 To be added |
+| 9 | Annual weather radials for the 40 stations (six panels, one per variable) | `Fig9a–f_*_AllStations.png` | ✅ |
+| 10 | Representative imputation examples (3 panels, one per variable/station) | `Fig10_Imputation_Examples.{png,pdf}` | ✅ |
+
+Figures marked 🚧 are in progress. Fig 4 ⚠ needs a re-plot to add the topmost row showing overall annual completeness, per the manuscript caption.
 
 ---
 
@@ -98,7 +115,7 @@ Each variable gains a companion `_flag` column (e.g. `AirTemp_flag`):
 ### ⚠️ Known instrument issues
 
 - **WS17 atmospheric pressure** — sensor fault (~811 hPa, ~200 hPa below ambient). `AtmPress Ave (hPa)` is `NaN` in both raw and imputed files. All other WS17 variables are valid.
-- **WS38 global irradiance** — complete pyranometer failure for the full year (0% valid). The imputed file contains a spatially-reconstructed estimate from neighbouring stations; treat with caution.
+- **WS38 global irradiance** — intentional lack of pyranometer for the full year (0% valid). The imputed file contains a spatially-reconstructed estimate from neighbouring stations; treat with caution.
 - **Wind speed / direction** — LOSO R² is negative at intra-campus scale (building wake effects decorrelate neighbouring stations). Use only flag = 0 observations for wind analyses.
 
 ---
@@ -152,6 +169,8 @@ Or set the data directory via environment variable:
 export NUS_WEATHER_DATA="/path/to/nus-campus-weather-paper"
 ```
 
+Package source: [github.com/City-Syntax/nus-campus-weather](https://github.com/City-Syntax/nus-campus-weather)
+
 ---
 
 ## ▶️ Reproducing the Analysis
@@ -160,12 +179,14 @@ Run the scripts in order from the repository root. Each script resolves paths re
 
 ```bash
 python code/1_data_quality_check.py        # → results/data_quality_summary.csv
-python code/2_plot_data_completeness.py    # → figures/Fig4, Fig5
-python code/3_plot_weather_data.py         # → figures/Fig6b, Fig7, Fig9
-python code/4_plot_weather_radials.py      # → figures/Fig6a, Fig8a–f
+python code/2_plot_data_completeness.py    # → figures/Fig4
+python code/3_plot_weather_data.py         # → figures/Fig6, Fig7
+python code/4_plot_weather_radials.py      # → figures/Fig9a–f
 python code/5_impute_missing_data.py       # → data/imputed/, results/imputation_*.csv
 python code/6_plot_imputation_examples.py  # → figures/Fig10
 ```
+
+> Plotting scripts updating in progress.
 
 **Dependencies:** Python ≥ 3.9
 
@@ -183,5 +204,5 @@ Citation will be added upon publication.
 
 ## 📜 Licence
 
-Data: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)  
+Data: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 Code: [MIT](https://opensource.org/licenses/MIT)
