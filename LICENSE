@@ -1,0 +1,16 @@
+This repository is dual-licensed.
+
+Source code, scripts, and documentation
+---------------------------------------
+  Path coverage: code/, README.md, build configuration, .gitignore
+  Licence:       MIT
+  Full text:     LICENSE-CODE
+
+Dataset, derived results, and figures
+-------------------------------------
+  Path coverage: data/raw/, data/imputed/, results/, figures/
+  Licence:       Creative Commons Attribution 4.0 International (CC BY 4.0)
+  Full text:     LICENSE-DATA
+  Summary:       https://creativecommons.org/licenses/by/4.0/
+
+Copyright (c) 2026 City Syntax Lab and contributors.

@@ -56,7 +56,9 @@ nus-campus-weather-paper/
 │       └── 3_build_ws_photo_slide.py
 │
 ├── .gitignore
-├── LICENSE
+├── LICENSE              # Pointer — repo is dual-licensed (see below)
+├── LICENSE-CODE         # MIT — applies to code/ and scripts
+├── LICENSE-DATA         # CC BY 4.0 — applies to data/, results/, figures/
 └── README.md
 ```
 
@@ -204,5 +206,13 @@ Citation will be added upon publication.
 
 ## 📜 Licence
 
-Data: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
-Code: [MIT](https://opensource.org/licenses/MIT)
+This repository is **dual-licensed**:
+
+| Scope | Licence | File |
+|---|---|---|
+| Source code, scripts, documentation (`code/`, `README.md`, build config) | [MIT](https://opensource.org/licenses/MIT) | [`LICENSE-CODE`](LICENSE-CODE) |
+| Dataset, derived results, figures (`data/`, `results/`, `figures/`) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | [`LICENSE-DATA`](LICENSE-DATA) |
+
+See [`LICENSE`](LICENSE) for the top-level summary.
+
+© 2026 City Syntax Lab and contributors.
