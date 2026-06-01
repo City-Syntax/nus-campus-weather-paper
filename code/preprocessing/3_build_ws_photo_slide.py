@@ -130,7 +130,7 @@ for i in range(1, 41):
     r1 = p1.add_run()
     r1.text = f"WS{i:02d}"
     r1.font.bold = True
-    r1.font.size = Pt(8)
+    r1.font.size = Pt(10)
     r1.font.color.rgb = RGBColor(255, 255, 255)
 
     # line 2: location
@@ -138,7 +138,7 @@ for i in range(1, 41):
     p2.alignment = PP_ALIGN.CENTER
     r2 = p2.add_run()
     r2.text = locations[i]
-    r2.font.size = Pt(6)
+    r2.font.size = Pt(8)
     r2.font.color.rgb = RGBColor(255, 255, 255)
 
 # ============================================================

@@ -36,7 +36,7 @@ MONTH_LABELS = [calendar.month_abbr[m] for m in range(1, 13)]
 VAR_COLORS = [VIRIDIS(x) for x in np.linspace(0.08, 0.92, 6)]
 
 # ── Variable definitions ──────────────────────────────────────────────────────
-# (col, short_label, unit, line_color, fig3/fig5_cmap)
+# (col, short_label, unit, line_color, fig6/fig10_cmap)
 VARS = [
     ("AirTemp Ave (C)",       "Air Temperature",    "°C",    VAR_COLORS[0], cm.YlOrRd),
     ("RelHum Ave (%)",        "Relative Humidity",  "%",     VAR_COLORS[1], cm.YlGnBu),
@@ -47,8 +47,8 @@ VARS = [
 ]
 
 # Fig 3 and Fig 5 drop Wind Direction
-VARS_FIG3 = [v for v in VARS if v[0] != "WindDir Ave (degrees)"]
-VARS_FIG5 = VARS_FIG3
+VARS_FIG6 = [v for v in VARS if v[0] != "WindDir Ave (degrees)"]
+VARS_FIG10 = VARS_FIG6
 
 PRESSURE_OUTLIER = "WS17"
 EXPECTED_HOURS   = 8760
@@ -140,18 +140,23 @@ def draw_station_windrose(ax, lon, lat, ws_series, wd_series,
     ax.scatter([lon], [lat], s=5, c="white", zorder=6, linewidths=0)
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Fig 3 — Diurnal × Seasonal Climatology  (Ladybug-style horizontal strips)
+# Fig 6 — Diurnal × Seasonal Climatology  (Ladybug-style horizontal strips)
 # ═════════════════════════════════════════════════════════════════════════════
-print("Building Fig 3...")
+print("Building Fig 6...")
 
 clean_df = all_df.copy()
 clean_df.loc[clean_df["station"] == PRESSURE_OUTLIER, "AtmPress Ave (hPa)"] = np.nan
 
-fig3, axes3 = plt.subplots(5, 1, figsize=(18, 14))
-fig3.patch.set_facecolor("white")
+fig6, axes3 = plt.subplots(5, 2, figsize=(15, 12), sharey=True)
+fig6.patch.set_facecolor("white")
 
-for ax, (col, label, unit, lc, cmap) in zip(axes3, VARS_FIG3):
+for axs, (col, label, unit, lc, cmap) in zip(axes3, VARS_FIG6):
+    # print(ax, col)
+    ax = axs[0]
+    ax2 = axs[1]
     climate = clean_df.groupby(["month", "hour"])[col].mean().unstack(level="hour")
+    climate_ground = clean_df[clean_df["Type"]=="Ground"].groupby(["month", "hour"])[col].mean().unstack(level="hour")
+    climate_roof = clean_df[clean_df["Type"]!="Ground"].groupby(["month", "hour"])[col].mean().unstack(level="hour")
     use_cmap = cmap
     vmin, vmax_v = climate.values.min(), climate.values.max()
 
@@ -159,70 +164,108 @@ for ax, (col, label, unit, lc, cmap) in zip(axes3, VARS_FIG3):
     if col == "GlobalRad Ave (W/m2)":
         vmin = 0
 
-    im = ax.imshow(climate.values, aspect="auto", cmap=use_cmap,
-                   vmin=vmin, vmax=vmax_v, interpolation="bilinear", origin="upper")
+    im = ax.imshow(climate_ground.values, aspect="auto", cmap=use_cmap,
+                   vmin=vmin, vmax=vmax_v)
+    im2 = ax2.imshow(climate_roof.values, aspect="auto", cmap=use_cmap,
+                   vmin=vmin, vmax=vmax_v)
 
     # Thin white cell grid (Ladybug style)
     ax.set_xticks(np.arange(-0.5, 24, 1), minor=True)
     ax.set_yticks(np.arange(-0.5, 12, 1), minor=True)
     ax.grid(which="minor", color="white", linewidth=0.4, linestyle="-")
     ax.tick_params(which="minor", length=0)
+    ax2.set_xticks(np.arange(-0.5, 24, 1), minor=True)
+    ax2.set_yticks(np.arange(-0.5, 12, 1), minor=True)
+    ax2.grid(which="minor", color="white", linewidth=0.4, linestyle="-")
+    ax2.tick_params(which="minor", length=0)
 
     ax.set_xticks(range(0, 24, 3))
     ax.set_xticklabels([f"{h:02d}h" for h in range(0, 24, 3)],
-                       fontsize=7.5, fontfamily=FONT)
+                       fontsize=8, fontfamily=FONT)
+    ax2.set_xticks(range(0, 24, 3))
+    ax2.set_xticklabels([f"{h:02d}h" for h in range(0, 24, 3)],
+                       fontsize=8, fontfamily=FONT)
+    
     ax.set_yticks(range(12))
     ax.set_yticklabels(MONTH_LABELS, fontsize=8, fontfamily=FONT)
+    ax2.yaxis.set_ticks_position('none') 
 
-    cb = fig3.colorbar(im, ax=ax, fraction=0.018, pad=0.01, aspect=14)
-    style_cb(cb, unit, fontsize=7.5)
+    cb = fig6.colorbar(im, ax=ax2, fraction=0.018, pad=0.01)
+    style_cb(cb, unit, fontsize=10)
 
-    ax.set_title(label, fontsize=9.5, fontfamily=FONT, fontweight="bold",
+    ax.set_title(label+ " - Ground", fontsize=10, fontfamily=FONT, fontweight="bold",
                  loc="left", pad=5)
-    ax.set_ylabel("Month", fontsize=8, fontfamily=FONT, labelpad=4)
-    ax.tick_params(labelsize=7.5)
+    ax2.set_title(label+ " - Rooftop", fontsize=10, fontfamily=FONT, fontweight="bold",
+                 loc="left", pad=5)
+    ax.set_ylabel("Month", fontsize=10, fontfamily=FONT)
+    ax.tick_params(labelsize=8)
     for sp in ax.spines.values():
         sp.set_linewidth(0.4)
 
-axes3[-1].set_xlabel("Hour of Day", fontsize=9, fontfamily=FONT, labelpad=6)
+# axes3[-1].set_xlabel("Hour of Day", fontsize=9, fontfamily=FONT, labelpad=6)
+fig6.supxlabel("Hour of Day", fontsize=10, fontfamily=FONT)
 
-fig3.suptitle(
+fig6.suptitle(
     "Diurnal and Seasonal Climatology — NUS Campus Meteorological Network (2025)\n"
     "Mean across 40 stations",
     fontsize=12, fontfamily=FONT, fontweight="bold", y=1.005
 )
-fig3.tight_layout(h_pad=1.2)
-out3 = os.path.join(ROOT, "figures", "Fig6b_Climatology_DiurnalSeasonal.png")
-fig3.savefig(out3, dpi=300, bbox_inches="tight")
-print(f"Saved: {out3}")
-plt.close(fig3)
+fig6.tight_layout(h_pad=1.2)
+out6 = os.path.join(ROOT, "figures", "Fig6_Climatology_DiurnalSeasonal.png")
+fig6.savefig(out6, dpi=300, bbox_inches="tight")
+print(f"Saved: {out6}")
+plt.close(fig6)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Fig 4 — Network Envelope Time Series  (monthly, with median)
 # ═════════════════════════════════════════════════════════════════════════════
 print("Building Fig 4...")
 
-fig4, axes4 = plt.subplots(6, 1, figsize=(14, 18), sharex=True)
-fig4.patch.set_facecolor("white")
+fig7, axes4 = plt.subplots(5, 2, figsize=(15, 12), sharex=True)
+fig7.patch.set_facecolor("white")
 xticks = list(range(12))
 
-for idx, (ax, (col, label, unit, lc, _)) in enumerate(zip(axes4, VARS)):
-
-    src = all_df.copy()
+for idx, (axs, (col, label, unit, lc, _)) in enumerate(zip(axes4, VARS_FIG6)):
+    ax = axs[0]
+    ax2 = axs[1]
+        
+    ground_src = all_df.copy()
+    ground_src = ground_src[ground_src["Type"]=="Ground"]
+    roof_src = all_df.copy()
+    roof_src = roof_src[roof_src["Type"]!="Ground"]
+        
     if col == "AtmPress Ave (hPa)":
-        src.loc[src["station"] == PRESSURE_OUTLIER, col] = np.nan
+        ground_src.loc[ground_src["station"] == PRESSURE_OUTLIER, col] = np.nan
+        roof_src.loc[roof_src["station"] == PRESSURE_OUTLIER, col] = np.nan
 
     if col == "WindDir Ave (degrees)":
-        monthly = (src.groupby(["station", "month"])[col]
+        ground_monthly = (ground_src.groupby(["station", "month"])[col]
+                   .apply(circ_mean).unstack(level="month"))
+        roof_monthly = (roof_src.groupby(["station", "month"])[col]
                    .apply(circ_mean).unstack(level="month"))
     else:
-        monthly = src.groupby(["station", "month"])[col].mean().unstack(level="month")
+        ground_monthly = ground_src.groupby(["station", "month"])[col].mean().unstack(level="month")
+        roof_monthly = roof_src.groupby(["station", "month"])[col].mean().unstack(level="month")
 
-    for ws in stations:
-        if ws not in monthly.index:
+    ground_stations = ground_monthly.index.to_list()
+    roof_stations = roof_monthly.index.to_list()
+
+    for ws in ground_stations:
+        if ws not in ground_monthly.index:
             continue
         is_outlier = (col == "AtmPress Ave (hPa)" and ws == PRESSURE_OUTLIER)
-        ax.plot(xticks, monthly.loc[ws].values,
+        ax.plot(xticks, ground_monthly.loc[ws].values,
+                color="#dddddd" if not is_outlier else "#E74C3C",
+                lw=0.7 if not is_outlier else 1.2,
+                alpha=0.6 if not is_outlier else 0.9,
+                linestyle="-" if not is_outlier else "--",
+                zorder=2 if not is_outlier else 5,
+                label=f"{PRESSURE_OUTLIER} (faulty sensor)" if is_outlier else None)
+    for ws in roof_stations:
+        if ws not in roof_monthly.index:
+            continue
+        is_outlier = (col == "AtmPress Ave (hPa)" and ws == PRESSURE_OUTLIER)
+        ax2.plot(xticks, roof_monthly.loc[ws].values,
                 color="#dddddd" if not is_outlier else "#E74C3C",
                 lw=0.7 if not is_outlier else 1.2,
                 alpha=0.6 if not is_outlier else 0.9,
@@ -230,30 +273,53 @@ for idx, (ax, (col, label, unit, lc, _)) in enumerate(zip(axes4, VARS)):
                 zorder=2 if not is_outlier else 5,
                 label=f"{PRESSURE_OUTLIER} (faulty sensor)" if is_outlier else None)
 
-    net        = monthly.drop(index=PRESSURE_OUTLIER, errors="ignore")
-    net_mean   = net.mean()
-    net_median = net.median()
-    net_std    = net.std()
+    ground_net        = ground_monthly.drop(index=PRESSURE_OUTLIER, errors="ignore")
+    ground_net_mean   = ground_net.mean()
+    ground_net_median = ground_net.median()
+    ground_net_std    = ground_net.std()
 
-    ax.fill_between(xticks, net_mean - net_std, net_mean + net_std,
+    roof_net        = roof_monthly.drop(index=PRESSURE_OUTLIER, errors="ignore")
+    roof_net_mean   = roof_net.mean()
+    roof_net_median = roof_net.median()
+    roof_net_std    = roof_net.std()
+
+    min_net = min([ground_net.min().min(), roof_net.min().min()])
+    max_net = max([ground_net.max().max(), roof_net.max().max()])
+
+    ax.fill_between(xticks, ground_net_mean - ground_net_std, ground_net_mean + ground_net_std,
                     color=lc, alpha=0.20, zorder=3)
-    ax.plot(xticks, net_mean + net_std, color=lc, lw=0.7,
+    ax.plot(xticks, ground_net_mean + ground_net_std, color=lc, lw=0.7,
             linestyle="--", alpha=0.55, zorder=3)
-    ax.plot(xticks, net_mean - net_std, color=lc, lw=0.7,
+    ax.plot(xticks, ground_net_mean - ground_net_std, color=lc, lw=0.7,
             linestyle="--", alpha=0.55, zorder=3)
-    ax.plot(xticks, net_mean,   color=lc, lw=2.4, zorder=4)
-    ax.plot(xticks, net_median, color=lc, lw=1.4, linestyle=":",
+    ax.plot(xticks, ground_net_mean,   color=lc, lw=2.4, zorder=4)
+    ax.plot(xticks, ground_net_median, color=lc, lw=1.4, linestyle=":",
             alpha=0.85, zorder=4)
-
+    ax2.fill_between(xticks, roof_net_mean - roof_net_std, roof_net_mean + roof_net_std,
+                    color=lc, alpha=0.20, zorder=3)
+    ax2.plot(xticks, roof_net_mean + roof_net_std, color=lc, lw=0.7,
+            linestyle="--", alpha=0.55, zorder=3)
+    ax2.plot(xticks, roof_net_mean - roof_net_std, color=lc, lw=0.7,
+            linestyle="--", alpha=0.55, zorder=3)
+    ax2.plot(xticks, roof_net_mean,   color=lc, lw=2.4, zorder=4)
+    ax2.plot(xticks, roof_net_median, color=lc, lw=1.4, linestyle=":",
+            alpha=0.85, zorder=4)
+    ax.set_ylim([min_net, max_net])
+    ax2.set_ylim([min_net, max_net])
     ax.set_ylabel(f"{label} ({unit})", fontsize=8.5, fontfamily=FONT, labelpad=5)
     ax.tick_params(labelsize=8)
     for sp in ax.spines.values():
         sp.set_linewidth(0.5)
+    for sp in ax2.spines.values():
+        sp.set_linewidth(0.5)
+
+    ax2.yaxis.set_ticks_position('none')
+    ax2.set_yticklabels([])
 
     if col == "AtmPress Ave (hPa)":
         ax.annotate(f"{PRESSURE_OUTLIER}: faulty pressure sensor",
-                    xy=(0.01, 0.08), xycoords="axes fraction",
-                    fontsize=7.5, fontfamily=FONT, color="#E74C3C",
+                    xy=(0.02, 0.08), xycoords="axes fraction",
+                    fontsize=10, fontfamily=FONT, color="#E74C3C",
                     fontstyle="italic")
 
 legend_elements = [
@@ -263,32 +329,36 @@ legend_elements = [
            alpha=0.85, label="Network median"),
     Patch(facecolor=VAR_COLORS[0], alpha=0.25, label="±1 std. dev."),
 ]
-axes4[0].legend(handles=legend_elements, fontsize=8, loc="upper right",
+fig7.legend(handles=legend_elements, fontsize=8, loc="upper right",
                 framealpha=0.88, edgecolor="#dddddd", fancybox=False,
                 prop={"family": FONT})
 
-axes4[-1].set_xticks(xticks)
-axes4[-1].set_xticklabels(MONTH_LABELS, fontsize=9, fontfamily=FONT)
-axes4[-1].set_xlabel("Month (2025)", fontsize=10, fontfamily=FONT, labelpad=8)
+for ax in axes4[-1]:
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(MONTH_LABELS, fontsize=9, fontfamily=FONT)
+fig7.supxlabel("Month (2025)", fontsize=10, fontfamily=FONT)
 
-fig4.suptitle(
+axes4[0,0].set_title("Ground Stations", fontsize=10, fontfamily=FONT, fontweight="bold", pad=15)
+axes4[0,1].set_title("Rooftop Stations", fontsize=10, fontfamily=FONT, fontweight="bold", pad=15)
+
+fig7.suptitle(
     "Monthly Network Time Series — NUS Campus Meteorological Observation Network (2025)\n"
     "All 40 stations (grey)  |  Network mean (solid) and median (dotted)  |  Shaded band = ±1 std. dev.",
     fontsize=11.5, fontfamily=FONT, fontweight="bold", y=1.005
 )
-fig4.tight_layout(h_pad=0.6)
-out4 = os.path.join(ROOT, "figures", "Fig7_NetworkTimeSeries.png")
-fig4.savefig(out4, dpi=300, bbox_inches="tight")
-print(f"Saved: {out4}")
-plt.close(fig4)
+fig7.tight_layout(h_pad=0.6)
+out7 = os.path.join(ROOT, "figures", "Fig7_NetworkTimeSeries.png")
+fig7.savefig(out7, dpi=300, bbox_inches="tight")
+print(f"Saved: {out7}")
+plt.close(fig7)
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Fig 5 — Spatial Variability Maps  (5 panels: Wind Dir removed — encoded in rose)
+# Fig 10 — Spatial Variability Maps  (5 panels: Wind Dir removed — encoded in rose)
 #   Color = annual mean value  (unique colormap per variable)
 #   Size  = data completeness for that variable at each station
 #   Wind Speed panel = geographic mini wind roses (speed + direction)
 # ═════════════════════════════════════════════════════════════════════════════
-print("Building Fig 5...")
+print("Building Fig 10...")
 
 annual       = {}
 completeness = {}
@@ -311,20 +381,20 @@ xlim = (min(lons) - pad, max(lons) + pad)
 ylim = (min(lats) - pad, max(lats) + pad)
 
 # 3-top + 2-bottom-centred layout via GridSpec
-fig5 = plt.figure(figsize=(18, 12))
-fig5.patch.set_facecolor("white")
-gs = GridSpec(2, 6, figure=fig5, hspace=0.38, wspace=0.30)
+fig10 = plt.figure(figsize=(18, 12))
+fig10.patch.set_facecolor("white")
+gs = GridSpec(2, 6, figure=fig10, hspace=0.38, wspace=0.30)
 axes5 = [
-    fig5.add_subplot(gs[0, 0:2]),   # Air Temperature
-    fig5.add_subplot(gs[0, 2:4]),   # Relative Humidity
-    fig5.add_subplot(gs[0, 4:6]),   # Wind Speed & Direction (rose)
-    fig5.add_subplot(gs[1, 1:3]),   # Atm. Pressure  (centred)
-    fig5.add_subplot(gs[1, 3:5]),   # Solar Radiation (centred)
+    fig10.add_subplot(gs[0, 0:2]),   # Air Temperature
+    fig10.add_subplot(gs[0, 2:4]),   # Relative Humidity
+    fig10.add_subplot(gs[0, 4:6]),   # Wind Speed & Direction (rose)
+    fig10.add_subplot(gs[1, 1:3]),   # Atm. Pressure  (centred)
+    fig10.add_subplot(gs[1, 3:5]),   # Solar Radiation (centred)
 ]
 
 WINDROSE_VMAX = 4.0   # m/s colour-scale ceiling
 
-for ax, (col, label, unit, lc, cmap5) in zip(axes5, VARS_FIG5):
+for ax, (col, label, unit, lc, cmap5) in zip(axes5, VARS_FIG10):
 
     ax.set_xlim(*xlim)
     ax.set_ylim(*ylim)
@@ -348,7 +418,7 @@ for ax, (col, label, unit, lc, cmap5) in zip(axes5, VARS_FIG5):
 
         sm = ScalarMappable(cmap=cmap5, norm=Normalize(vmin=0, vmax=WINDROSE_VMAX))
         sm.set_array([])
-        cb = fig5.colorbar(sm, ax=ax, fraction=0.033, pad=0.02, aspect=22)
+        cb = fig10.colorbar(sm, ax=ax, fraction=0.033, pad=0.02, aspect=22)
         style_cb(cb, unit, fontsize=8)
 
         style_ax(ax, xlabel="Longitude (°E)", ylabel="Latitude (°N)",
@@ -382,7 +452,7 @@ for ax, (col, label, unit, lc, cmap5) in zip(axes5, VARS_FIG5):
                     xytext=(4, 4), textcoords="offset points",
                     fontsize=6, color="red", fontfamily=FONT)
 
-    cb = fig5.colorbar(sc, ax=ax, fraction=0.033, pad=0.02, aspect=22)
+    cb = fig10.colorbar(sc, ax=ax, fraction=0.033, pad=0.02, aspect=22)
     style_cb(cb, unit, fontsize=8)
     style_ax(ax, xlabel="Longitude (°E)", ylabel="Latitude (°N)",
              title=label, fontsize=8)
@@ -397,19 +467,19 @@ for ax, (col, label, unit, lc, cmap5) in zip(axes5, VARS_FIG5):
               labelspacing=0.8, handletextpad=0.7, borderpad=0.8,
               prop={"family": FONT})
 
-fig5.text(0.01, 0.003,
+fig10.text(0.01, 0.003,
           "* WS17 excluded from Atm. Pressure panel (faulty sensor, mean = 812 hPa)."
           "  Circle size = per-variable data completeness.  Wind direction encoded in rose bar length.",
           fontsize=7.5, fontfamily=FONT, fontstyle="italic", color="#555555")
 
-fig5.suptitle(
+fig10.suptitle(
     "Spatial Variability of Annual Mean Meteorological Variables\n"
     "NUS Campus Observation Network (2025)  |  40 stations  |  Circle size = data completeness",
     fontsize=13, fontfamily=FONT, fontweight="bold", y=1.01
 )
-out5 = os.path.join(ROOT, "figures", "Fig9_SpatialVariability.png")
-fig5.savefig(out5, dpi=300, bbox_inches="tight")
-print(f"Saved: {out5}")
-plt.close(fig5)
+out10 = os.path.join(ROOT, "figures", "additional_figures", "AddFig11_SpatialVariability.png")
+fig10.savefig(out10, dpi=300, bbox_inches="tight")
+print(f"Saved: {out10}")
+plt.close(fig10)
 
 print("\nAll 3 figures complete.")

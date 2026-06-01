@@ -41,6 +41,7 @@ VAR_COLS = {
     "AtmPress Ave (hPa)":    "Atm Press",
     "GlobalRad Ave (W/m2)":  "Solar Rad",
 }
+VAR_COLS_WS38 = {k: v for k, v in VAR_COLS.items() if k != "GlobalRad Ave (W/m2)"}
 FILES = sorted(glob.glob(os.path.join(ROOT, "data", "raw", "NUS_CAMPUS_WS*.csv")))
 
 # ── Load data ─────────────────────────────────────────────────────────────────
@@ -53,9 +54,11 @@ for fpath in FILES:
     lat = df["Latitude"].iloc[0]
     lon = df["Longitude"].iloc[0]
     valid_cols = [c for c in VAR_COLS if c in df.columns]
+    if ws == "WS38":
+        valid_cols = [c for c in VAR_COLS_WS38 if c in df.columns]
     # Mean of per-variable completeness (same metric as Fig 2). Gives credit for
-    # working sensors while still penalising partial-sensor failures (e.g. WS38
-    # pyranometer, which stays dead all year while the other five vars work).
+    # working sensors while still penalising partial-sensor failures 
+    # (excl. WS38 GlobalRad, which has no pyranometer).
     per_var_pct = [df[c].notna().sum() / EXPECTED_HOURS * 100 for c in valid_cols]
     overall = sum(per_var_pct) / len(per_var_pct)
     station_meta[ws] = {"lat": lat, "lon": lon, "overall": overall}
@@ -73,6 +76,7 @@ for fpath in FILES:
     monthly_data[ws] = monthly
 
 stations = sorted(station_meta.keys())
+df_stationmeta = pd.DataFrame(station_meta)
 
 # ── Force-based spread to nudge overlapping bubbles apart ────────────────────
 def spread_positions(orig_lons, orig_lats,
@@ -115,10 +119,10 @@ sizes     = [max(((v / 100) ** 2.2) * 700 + 65, 220) for v in vals]
 plot_lons, plot_lats = spread_positions(orig_lons, orig_lats)
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Fig 1 — Bubble Map
+# Fig 4a — Bubble Map
 # ═════════════════════════════════════════════════════════════════════════════
-fig1, ax1 = plt.subplots(figsize=(11, 9))
-fig1.patch.set_facecolor("white")
+fig4a, ax1 = plt.subplots(figsize=(11, 9))
+fig4a.patch.set_facecolor("white")
 
 pad_lon, pad_lat = 0.004, 0.004
 ax1.set_xlim(min(orig_lons) - pad_lon, max(orig_lons) + pad_lon)
@@ -146,7 +150,7 @@ for lon, lat, ws, val in zip(plot_lons, plot_lats, stations, vals):
     )
 
 # Colorbar
-cbar = fig1.colorbar(sc, ax=ax1, fraction=0.028, pad=0.02, aspect=30)
+cbar = fig4a.colorbar(sc, ax=ax1, fraction=0.028, pad=0.02, aspect=30)
 cbar.set_label("Mean per-variable completeness (%)", fontsize=10,
                fontfamily=FONT, labelpad=10)
 cbar.ax.tick_params(labelsize=8.5)
@@ -181,14 +185,14 @@ ax1.set_title(
     fontsize=12.5, fontfamily=FONT, fontweight="bold", pad=16, loc="left"
 )
 
-fig1.tight_layout()
-out1 = os.path.join(ROOT, "figures", "Fig4_BubbleMap_Completeness.png")
-fig1.savefig(out1, dpi=300, bbox_inches="tight")
-print(f"Saved: {out1}")
-plt.close(fig1)
+fig4a.tight_layout()
+out4a = os.path.join(ROOT, "figures", "additional_figures", "AddFig4a_BubbleMap_Completeness.png")
+fig4a.savefig(out4a, dpi=300, bbox_inches="tight")
+print(f"Saved: {out4a}")
+plt.close(fig4a)
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Fig 2 — Heatmap
+# Fig 4b — Heatmap
 # ═════════════════════════════════════════════════════════════════════════════
 NO_DATA_THRESH = 5
 
@@ -204,8 +208,8 @@ mako_nd = copy.copy(MAKO)
 mako_nd.set_bad("#d4d4d4")
 masked_matrix = np.ma.masked_where(matrix.values < NO_DATA_THRESH, matrix.values)
 
-fig2, ax2 = plt.subplots(figsize=(14, 12))
-fig2.patch.set_facecolor("white")
+fig4b, ax2 = plt.subplots(figsize=(14, 12))
+fig4b.patch.set_facecolor("white")
 
 im = ax2.imshow(
     masked_matrix, aspect="auto",
@@ -238,7 +242,7 @@ ax2.tick_params(which="minor", length=0)
 for spine in ax2.spines.values():
     spine.set_linewidth(0.5)
 
-cbar2 = fig2.colorbar(im, ax=ax2, fraction=0.022, pad=0.015, aspect=35)
+cbar2 = fig4b.colorbar(im, ax=ax2, fraction=0.022, pad=0.015, aspect=35)
 cbar2.set_label("Mean per-variable completeness (%)", fontsize=10,
                 fontfamily=FONT, labelpad=10)
 cbar2.ax.tick_params(labelsize=8.5)
@@ -259,9 +263,100 @@ ax2.set_title(
     fontsize=12.5, fontfamily=FONT, fontweight="bold", pad=16, loc="left"
 )
 
-fig2.tight_layout()
-out2 = os.path.join(ROOT, "figures", "Fig5_Heatmap_MonthlyCompleteness.png")
-fig2.savefig(out2, dpi=300, bbox_inches="tight")
-print(f"Saved: {out2}")
+fig4b.tight_layout()
+out4b = os.path.join(ROOT, "figures", "additional_figures", "AddFig4b_Heatmap_MonthlyCompleteness.png")
+fig4b.savefig(out4b, dpi=300, bbox_inches="tight")
+print(f"Saved: {out4b}")
 plt.close("all")
-print("\nBoth figures complete.")
+
+
+###### ═════════════════════════════════════════════════════════════════════════════
+# Fig 4 — Heatmap (Condensed)
+# ═════════════════════════════════════════════════════════════════════════════
+NO_DATA_THRESH = 15
+
+matrix = pd.DataFrame(
+    {ws: [monthly_data[ws][m] for m in range(1, 13)] for ws in stations},
+    index=[calendar.month_abbr[m] for m in range(1, 13)]
+)
+
+row_order = stations  # natural WS01 -> WS40 order for cross-referencing with other figures
+
+mako_nd = copy.copy(MAKO)
+mako_nd.set_bad("#d4d4d4")
+masked_matrix = np.ma.masked_where(matrix.values < NO_DATA_THRESH, matrix.values)
+
+fig4, fig4_ax = plt.subplots(2,1, figsize=(15, 5.5), gridspec_kw={'height_ratios': [1, 12]}, sharex=True, layout='constrained')
+ax3 = fig4_ax[0]
+ax4 = fig4_ax[1]
+fig4.patch.set_facecolor("white")
+
+im_overall = ax3.imshow(
+    df_stationmeta.drop(index=['lat', 'lon']), aspect="auto",
+    cmap=mako_nd, vmin=30, vmax=100,
+    interpolation="nearest", alpha=0.92,
+)
+
+ax3.set_yticks(range(1))
+ax3.set_yticklabels(["Overall"], fontsize=12, fontfamily=FONT)
+ax3.set_xticks(np.arange(-0.5, len(row_order), 1), minor=True)
+ax3.xaxis.set_ticks_position('none') 
+ax3.grid(which="minor", color="white", linewidth=1.0)
+ax3.tick_params(which="minor", length=0)
+for spine in ax3.spines.values():
+    spine.set_visible(False)
+
+for j in range(len(row_order)):
+    v = df_stationmeta.drop(index=['lat', 'lon']).values[0,j]
+    txt_color = "white" if v < 70 else "#1a1a1a"
+    ax3.text(j, 0, f"{v:.0f}", ha="center", va="center",
+             fontsize=10, fontweight="bold",
+             color=txt_color, fontfamily=FONT)
+
+im = ax4.imshow(
+    masked_matrix, aspect="auto",
+    # cmap=newcmp, vmin=-0.5, vmax=8.5,
+    cmap=mako_nd, vmin=30, vmax=100,
+    interpolation="nearest", alpha=0.92,
+)
+
+ax4.set_yticks(range(12))
+ax4.set_yticklabels(matrix.index, fontsize=12, fontfamily=FONT)
+ax4.set_xticks(range(len(row_order)))
+xlabels = [x[2:] for x in row_order]
+ax4.set_xticklabels(xlabels, fontsize=12, fontfamily=FONT)
+
+ax4.set_yticks(np.arange(-0.5, 12, 1), minor=True)
+ax4.set_xticks(np.arange(-0.5, len(row_order), 1), minor=True)
+ax4.grid(which="minor", color="white", linewidth=1.0)
+ax4.tick_params(which="minor", length=0)
+for spine in ax4.spines.values():
+    spine.set_linewidth(0.5)
+
+cbar3 = fig4b.colorbar(im, fraction=0.022, pad=0.015, aspect=35)
+cbar3.set_label("Mean per-variable completeness (%)", fontsize=12,
+                fontfamily=FONT, labelpad=10)
+cbar3.ax.tick_params(labelsize=10)
+for spine in cbar3.ax.spines.values():
+    spine.set_linewidth(0.5)
+
+nd_patch2 = Patch(facecolor="#d4d4d4", edgecolor="#aaaaaa",
+                 linewidth=0.5, label="N/A (<15%)")
+fig4.legend(handles=[nd_patch2], loc="lower right", bbox_to_anchor=(1.025, 0.03), fontsize=8,
+           framealpha=0, edgecolor="#cccccc", fancybox=False,
+           prop={"family": FONT})
+
+ax4.set_ylabel("Month", fontsize=12, fontfamily=FONT, labelpad=8)
+ax4.set_xlabel("Weather Station", fontsize=12, fontfamily=FONT, labelpad=8)
+fig4.suptitle(
+    "Monthly Mean Per-Variable Completeness —\n"
+    "NUS Campus Meteorological Observation Network (2025)",
+    fontsize=12.5, fontfamily=FONT, fontweight="bold", ha="left", x=0.05
+)
+
+out4 = os.path.join(ROOT, "figures", "Fig4_Heatmap_Completeness.png")
+fig4.savefig(out4, dpi=300, bbox_inches="tight")
+print(f"Saved: {out4}")
+plt.close("all")
+
+print("\nAll figures complete.")
