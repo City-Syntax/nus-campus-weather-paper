@@ -110,7 +110,7 @@ Each variable gains a companion `_flag` column (e.g. `AirTemp_flag`):
 - **Global irradiance, WS32 and WS39** — pyranometers non-functional (near-constant output with no diurnal cycle); whole year removed. Together with **WS38** (no pyranometer; fully shaded semi-outdoor site), these three stations have no irradiance data and are **not imputed** (flag 3).
 - **Global irradiance, WS07 (Sep–Dec), WS19 (Feb–Mar), WS23 (Mar–Sep), WS26 (May, Aug–Dec)** — corrupted channel (spurious night-time readings up to 1,500 W m⁻²); affected months removed. Isolated night-time readings above 20 W m⁻² removed elsewhere.
 - **Atmospheric pressure, WS17 (Jan–Apr)** — sensor fault (readings of 460–478 hPa); removed. Values from June onward are valid.
-- **Wind, WS17 (20–26 Dec)** — anemometer malfunction (stale records, hourly means up to 17 m/s); removed. Short runs of stale wind records at WS01 and WS03 also removed.
+- **Wind, WS17 (December)** — anemometer malfunction: stalled records between 7 and 28 Dec, and implausible hourly means up to 17 m/s on 20–26 Dec; removed. Short runs of stalled wind records at WS01 and WS03 also removed.
 
 Removed periods are then treated as ordinary gaps by the gap-filling pipeline (except the three irradiance stations above). The imputation procedure is described in the *Gap-filling methodology* section of the paper and implemented in `code/5_impute_missing_data.py`.
 

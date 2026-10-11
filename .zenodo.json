@@ -1,0 +1,74 @@
+{
+  "title": "Hourly meteorological dataset from a 40-station network on the NUS campus, Singapore (2025)",
+  "upload_type": "dataset",
+  "description": "<p>Hourly observations of air temperature, relative humidity, atmospheric pressure, global horizontal irradiance, wind speed and wind direction from 40 automatic weather stations on the National University of Singapore main campus, 1 January to 31 December 2025, with rainfall at three rooftop stations and station metadata (coordinates, elevation, mounting type).</p><p>The release contains the quality-controlled observations (data/raw), a gap-filled dataset with a provenance flag for every value (data/imputed; 0 = observed, 1 = linear interpolation, 2 = XGBoost spatial regression, 3 = not measured/not imputed), the quality-control log and validation results (data_quality_assessment), figures, and the Python scripts that produce them (code). Gap-filled wind values have little or no skill; use flag 0 values for wind analyses.</p><p>Version 1.1.0 adds rule-based quality control (faulty irradiance, pressure and wind records removed and logged), variable-specific interpolation limits and a validation of short-gap interpolation. The unmasked sensor values are preserved in version 1.0.0.</p>",
+  "creators": [
+    {
+      "name": "Lim, Joie",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    },
+    {
+      "name": "Ignatius, Marcel",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    },
+    {
+      "name": "Xu, Ruohan",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    },
+    {
+      "name": "Tong, Shanshan",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    },
+    {
+      "name": "Lu, Yijun",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    },
+    {
+      "name": "Tan, Erna",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    },
+    {
+      "name": "Oo, May Lwin",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    },
+    {
+      "name": "Chen, Xueyu",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    },
+    {
+      "name": "Zhu, Lujia",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    },
+    {
+      "name": "Biljecki, Filip",
+      "affiliation": "College of Design and Engineering, National University of Singapore; Business School, National University of Singapore"
+    },
+    {
+      "name": "Miller, Clayton",
+      "affiliation": "College of Integrative Studies, Singapore Management University"
+    },
+    {
+      "name": "Wong, Nyuk Hien",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    },
+    {
+      "name": "Chew, Lup Wai",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    },
+    {
+      "name": "Ang, Yu Qian",
+      "affiliation": "College of Design and Engineering, National University of Singapore"
+    }
+  ],
+  "license": "cc-by-4.0",
+  "access_right": "open",
+  "keywords": [
+    "urban climate",
+    "urban microclimate",
+    "weather station network",
+    "Singapore",
+    "tropical",
+    "gap filling",
+    "XGBoost"
+  ]
+}
