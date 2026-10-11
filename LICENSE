@@ -8,7 +8,7 @@ Source code, scripts, and documentation
 
 Dataset, derived results, and figures
 -------------------------------------
-  Path coverage: data/raw/, data/imputed/, results/, figures/
+  Path coverage: data/raw/, data/imputed/, data_quality_assessment/, figures/
   Licence:       Creative Commons Attribution 4.0 International (CC BY 4.0)
   Full text:     LICENSE-DATA
   Summary:       https://creativecommons.org/licenses/by/4.0/

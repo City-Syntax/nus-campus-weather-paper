@@ -15,7 +15,17 @@ import contextily as ctx
 import glob, os, calendar
 
 # ── Style ─────────────────────────────────────────────────────────────────────
-FONT = "Palatino Linotype"
+from matplotlib import font_manager as _fm
+
+
+def _pick_font(cands=("Palatino Linotype", "Palatino", "TeX Gyre Pagella",
+                      "URW Palladio L", "P052")):
+    """Palatino on Windows/macOS; metric-compatible clone elsewhere."""
+    have = {f.name for f in _fm.fontManager.ttflist}
+    return next((c for c in cands if c in have), "serif")
+
+
+FONT = _pick_font()
 plt.rcParams.update({
     "font.family":        FONT,
     "axes.spines.top":    False,
@@ -50,7 +60,9 @@ VARS = [
 VARS_FIG6 = [v for v in VARS if v[0] != "WindDir Ave (degrees)"]
 VARS_FIG10 = VARS_FIG6
 
-PRESSURE_OUTLIER = "WS17"
+# Faulty WS17 pressure (Jan–Apr) is removed by 0_quality_control.py, so no
+# station is excluded any more; set a station ID here to exclude one.
+PRESSURE_OUTLIER = ""
 EXPECTED_HOURS   = 8760
 
 # ── Load all data ─────────────────────────────────────────────────────────────
@@ -316,7 +328,7 @@ for idx, (axs, (col, label, unit, lc, _)) in enumerate(zip(axes4, VARS_FIG6)):
     ax2.yaxis.set_ticks_position('none')
     ax2.set_yticklabels([])
 
-    if col == "AtmPress Ave (hPa)":
+    if col == "AtmPress Ave (hPa)" and PRESSURE_OUTLIER:
         ax.annotate(f"{PRESSURE_OUTLIER}: faulty pressure sensor",
                     xy=(0.02, 0.08), xycoords="axes fraction",
                     fontsize=10, fontfamily=FONT, color="#E74C3C",
@@ -398,9 +410,12 @@ for ax, (col, label, unit, lc, cmap5) in zip(axes5, VARS_FIG10):
 
     ax.set_xlim(*xlim)
     ax.set_ylim(*ylim)
-    ctx.add_basemap(ax, crs="EPSG:4326",
+    try:  # basemap tiles need internet access; figure still renders without
+        ctx.add_basemap(ax, crs="EPSG:4326",
                     source=ctx.providers.CartoDB.Positron,
                     alpha=0.40, zorder=0, attribution=False)
+    except Exception as e:
+        print(f'  basemap skipped: {e}')
     ax.xaxis.set_major_formatter(FormatStrFormatter("%.3f"))
     ax.yaxis.set_major_formatter(FormatStrFormatter("%.3f"))
 
@@ -448,7 +463,7 @@ for ax, (col, label, unit, lc, cmap5) in zip(axes5, VARS_FIG10):
     for i in faulty_idx:
         ax.scatter(lons[i], lats[i], c="red", marker="x",
                    s=120, linewidths=2, zorder=6)
-        ax.annotate("WS17*", xy=(lons[i], lats[i]),
+        ax.annotate(f"{PRESSURE_OUTLIER}*", xy=(lons[i], lats[i]),
                     xytext=(4, 4), textcoords="offset points",
                     fontsize=6, color="red", fontfamily=FONT)
 
@@ -468,8 +483,8 @@ for ax, (col, label, unit, lc, cmap5) in zip(axes5, VARS_FIG10):
               prop={"family": FONT})
 
 fig10.text(0.01, 0.003,
-          "* WS17 excluded from Atm. Pressure panel (faulty sensor, mean = 812 hPa)."
-          "  Circle size = per-variable data completeness.  Wind direction encoded in rose bar length.",
+          (f"* {PRESSURE_OUTLIER} excluded from Atm. Pressure panel (faulty sensor).  " if PRESSURE_OUTLIER else "")
+          + "Circle size = per-variable data completeness.  Wind direction encoded in rose bar length.",
           fontsize=7.5, fontfamily=FONT, fontstyle="italic", color="#555555")
 
 fig10.suptitle(

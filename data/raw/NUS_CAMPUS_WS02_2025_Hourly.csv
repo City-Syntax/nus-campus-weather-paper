@@ -1,4 +1,4 @@
-Datetime,Latitude,Longitude,Elevation,Type,WindSpeed Ave (m/s),WindDir Ave (degrees),AirTemp Ave (C),RelHum Ave (%),AtmPress Ave (hPa),GlobalRad Ave (W/m2),Rain Tot (mm)
+Datetime,Latitude,Longitude,Elevation (m),Type,WindSpeed Ave (m/s),WindDir Ave (degrees),AirTemp Ave (C),RelHum Ave (%),AtmPress Ave (hPa),GlobalRad Ave (W/m2),Rain Tot (mm)
 2025-01-01 00:00:00,1.2994913,103.7705849,71.802,Roof-3axis,2.7509469254894467,33.858944622938964,25.812033898305085,90.30169491525425,1004.186440677966,0.0,0.0
 2025-01-01 01:00:00,1.2994913,103.7705849,71.802,Roof-3axis,2.378190157613,29.381082842068054,25.791,90.08166666666666,1003.83,0.0,0.0
 2025-01-01 02:00:00,1.2994913,103.7705849,71.802,Roof-3axis,2.793154509764427,32.28559542938325,25.7225,90.265,1003.1233333333332,0.0,0.0

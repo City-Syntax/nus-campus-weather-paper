@@ -6,9 +6,12 @@
 # ───────────────────────
 # Two-stage spatial imputation:
 #
-#   Stage 1 — Linear interpolation for contiguous gaps ≤ LINEAR_GAP_H hours
-#     where valid observations exist on both sides.  Wind direction is
-#     interpolated via the shortest circular arc to avoid 359°→1° artefacts.
+#   Stage 1 — Linear interpolation for contiguous gaps up to a
+#     variable-specific limit (LINEAR_GAP_H) where valid observations exist on
+#     both sides.  Wind direction is interpolated via the shortest circular arc
+#     to avoid 359°→1° artefacts.  The limits are the longest gap lengths for
+#     which linear interpolation was at least as accurate as the Stage 2 model
+#     in the head-to-head test below (v1.1.0; v1.0.0 used 6 h for all).
 #
 #   Stage 2 — Gradient-boosted spatial regression (XGBoost) for all
 #     remaining gaps.  One model is trained per meteorological variable
@@ -31,19 +34,32 @@
 #   stations and applied to synthetic contiguous gaps of lengths
 #   {6, 24, 72, 168, 720} h excised from the held-out records.
 #   N_BLOCKS independent non-overlapping gaps are sampled per
-#   (station × block-length) combination.  Metrics reported:
+#   (station × block-length) combination.  The held-out station's
+#   anomaly baseline (its mean) is computed with the gap excluded, as it
+#   would be for a real gap.  Metrics reported:
 #     MAE  — mean absolute error (physical units)
 #     RMSE — root mean square error
 #     MBE  — mean bias error (sign indicates over/under prediction)
 #     R²   — coefficient of determination
 #   Wind direction uses mean circular error (degrees).
 #
-# SPECIAL CASES
-#   WS17 AtmPress : faulty sensor (mean ≈ 811 hPa); kept as NaN throughout,
-#                   not imputed, flag column set to 0.
-#   WS38 GlobalRad: 0 % valid for the entire year; imputed from spatial
-#                   model only (no training targets from WS38 solar).
-#                   Validated indirectly via proxy station masking.
+# STAGE 1 VALIDATION — linear interpolation vs Stage 2 on identical gaps
+#   At the same held-out stations, N_BLOCKS_SHORT synthetic gaps of
+#   {1, 2, 3, 6, 12, 24} h are filled by both linear interpolation and the
+#   LOSO Stage 2 model.  Output: stage1_validation*.csv.  This sets the
+#   LINEAR_GAP_H limits and gives the expected error of flag = 1 values.
+#
+# FLAGS
+#   0 = original observation, 1 = Stage 1 linear interpolation,
+#   2 = Stage 2 XGBoost spatial regression, 3 = not measured / not imputed.
+#
+# NOT IMPUTED (flag 3)
+#   Station-variables with less than MIN_VALID_FRACTION of the year observed
+#   are not reconstructed, because the station's own baseline is unknown:
+#   global irradiance at WS38 (no pyranometer) and at WS32 and WS39
+#   (pyranometers non-functional, removed by 0_quality_control.py).
+#   Faulty periods (e.g. WS17 pressure, Jan–Apr) are removed by
+#   0_quality_control.py and then treated as ordinary gaps.
 # ─────────────────────────────────────────────────────────────────────────────
 
 import sys, os, glob, time, warnings, io
@@ -60,20 +76,32 @@ warnings.filterwarnings("ignore")
 # ═══════════════════════════════════════════════════════════════════════════════
 # Config
 # ═══════════════════════════════════════════════════════════════════════════════
-LINEAR_GAP_H     = 6          # gaps ≤ this hours → linear interpolation
-K_SPATIAL        = 8          # nearest-neighbour stations for spatial features
-EVAL_STATIONS    = ["WS01", "WS08", "WS12", "WS24", "WS28"]   # held-out for LOSO
-BLOCK_LENGTHS    = [6, 24, 72, 168, 720]                       # synthetic gap lengths (h)
-N_BLOCKS         = 5          # non-overlapping synthetic gaps per (station × length)
-RANDOM_SEED      = 42
-PRESSURE_OUTLIER = "WS17"     # faulty AtmPress sensor — excluded throughout
+# Stage 1 limits (h): longest gap filled by linear interpolation, per variable.
+# 0 = never interpolated (always Stage 2).  See STAGE 1 VALIDATION above.
+LINEAR_GAP_H = {
+    "AirTemp Ave (C)":       1,
+    "RelHum Ave (%)":        1,
+    "AtmPress Ave (hPa)":    0,
+    "GlobalRad Ave (W/m2)":  3,
+    "WindSpeed Ave (m/s)":   12,
+    "WindDir Ave (degrees)": 12,
+}
+K_SPATIAL          = 8        # nearest-neighbour stations for spatial features
+EVAL_STATIONS      = ["WS01", "WS08", "WS12", "WS24", "WS28"]   # held-out for LOSO
+BLOCK_LENGTHS      = [6, 24, 72, 168, 720]                       # synthetic gap lengths (h)
+N_BLOCKS           = 5        # non-overlapping synthetic gaps per (station × length)
+SHORT_BLOCKS       = [1, 2, 3, 6, 12, 24]                        # Stage 1 validation (h)
+N_BLOCKS_SHORT     = 40       # gaps per (station × length) for Stage 1 validation
+MIN_VALID_FRACTION = 0.10     # below this, a station-variable is not imputed (flag 3)
+RANDOM_SEED        = 42
 
-rng = np.random.default_rng(RANDOM_SEED)
+rng       = np.random.default_rng(RANDOM_SEED)       # LOSO (Table 7)
+rng_short = np.random.default_rng(RANDOM_SEED + 1)   # Stage 1 validation
 
 ROOT     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT, "data", "raw")
 OUT_DIR  = os.path.join(ROOT, "data", "imputed")
-RESULT_DIR = os.path.join(ROOT, "results")
+RESULT_DIR = os.path.join(ROOT, "data_quality_assessment")
 os.makedirs(OUT_DIR, exist_ok=True)
 os.makedirs(RESULT_DIR, exist_ok=True)
 
@@ -127,13 +155,10 @@ for fpath in FILES:
     if len(lat_s) == 0:
         continue
     meta[ws] = {"lat": float(lat_s.iloc[0]), "lon": float(lon_s.iloc[0])}
-    if ws == PRESSURE_OUTLIER:
-        df["AtmPress Ave (hPa)"] = np.nan
     raw[ws] = df
 
 stations = sorted(raw.keys())
 print(f"Loaded {len(stations)} stations | {FULL_IDX[0].date()} – {FULL_IDX[-1].date()}")
-print(f"WS17 AtmPress set to NaN (faulty sensor, mean ≈ 811 hPa).")
 
 # ── Pivot tables: variable → (timestep × station) ─────────────────────────
 pivots = {v: pd.DataFrame({ws: raw[ws][v] for ws in stations}, index=FULL_IDX)
@@ -190,7 +215,7 @@ for ws in stations:
 # 3 — Stage 1: Linear interpolation (gaps ≤ LINEAR_GAP_H, bounded on both sides)
 # ═══════════════════════════════════════════════════════════════════════════════
 print(f"\n{'=' * 70}")
-print(f"Stage 1 — Linear interpolation (gaps ≤ {LINEAR_GAP_H} h)")
+print(f"Stage 1 — Linear interpolation (variable-specific limits: {LINEAR_GAP_H})")
 
 s1_pivots = {v: pivots[v].copy() for v in ALL_VARS}
 s1_counts = {v: 0 for v in ALL_VARS}
@@ -200,7 +225,7 @@ for ws in stations:
         col = s1_pivots[v][ws].copy()
         arr = col.values.astype(float)
         for start, length in find_gap_runs(arr):
-            if length > LINEAR_GAP_H:
+            if length > LINEAR_GAP_H[v]:
                 continue
             if start == 0 or start + length >= len(arr):
                 continue
@@ -301,17 +326,46 @@ def circ_mae_deg(y_true, y_pred):
     return float(np.mean(diff))
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 4 — LOSO Cross-Validation
+# 4 — LOSO Cross-Validation (Table 7) and Stage 1 validation
 # ═══════════════════════════════════════════════════════════════════════════════
 print(f"\n{'=' * 70}")
 print("LOSO Cross-Validation")
 print(f"  Held-out stations : {EVAL_STATIONS}")
 print(f"  Training stations : {len(stations) - len(EVAL_STATIONS)}")
-print(f"  Block lengths     : {BLOCK_LENGTHS} h")
-print(f"  Gaps per length   : {N_BLOCKS}")
+print(f"  Block lengths     : {BLOCK_LENGTHS} h  ({N_BLOCKS} gaps each)")
+print(f"  Stage 1 test      : {SHORT_BLOCKS} h  ({N_BLOCKS_SHORT} gaps each)")
 
 loso_train_stations = [ws for ws in stations if ws not in EVAL_STATIONS]
 eval_records = []
+s1_records   = []
+
+
+def sample_gaps(truth, bl, n, generator):
+    """Non-overlapping start positions of fully observed windows of length bl,
+    with at least one valid value on each side (needed for interpolation)."""
+    ok = np.isfinite(truth).astype(int)
+    cumv = np.concatenate([[0], np.cumsum(ok)])
+    window_valid = cumv[bl:] - cumv[:-bl]
+    possible = [i for i in np.where(window_valid == bl)[0]
+                if i >= 5 and i + bl <= len(truth) - 5
+                and ok[i - 1] and ok[i + bl]]
+    chosen = []
+    for _ in range(n * 20):
+        if len(chosen) >= n or not possible:
+            break
+        st = int(generator.choice(possible))
+        if any(max(st, a) < min(st + bl, b) for a, b in chosen):
+            continue
+        chosen.append((st, st + bl))
+    return [a for a, _ in chosen]
+
+
+def predict_gap(v, models, X_gap, base):
+    if v == VAR_WD:
+        m_sin, m_cos = models
+        return np.degrees(np.arctan2(m_sin.predict(X_gap), m_cos.predict(X_gap))) % 360
+    return models.predict(X_gap) + base
+
 
 for v in ALL_VARS:
     is_wd = (v == VAR_WD)
@@ -322,8 +376,6 @@ for v in ALL_VARS:
     Xs, ys_sin, ys_cos, ys_num = [], [], [], []
 
     for ws in loso_train_stations:
-        if v == "AtmPress Ave (hPa)" and ws == PRESSURE_OUTLIER:
-            continue
         valid = ~pivots[v][ws].isna()   # train on original (uninterpolated) targets
         if valid.sum() < 100:
             continue
@@ -342,63 +394,42 @@ for v in ALL_VARS:
         y_cos_tr = pd.concat(ys_cos).reset_index(drop=True)
         m_sin = XGBRegressor(**XGB_PARAMS); m_sin.fit(X_tr, y_sin_tr)
         m_cos = XGBRegressor(**XGB_PARAMS); m_cos.fit(X_tr, y_cos_tr)
+        models = (m_sin, m_cos)
     else:
         y_tr = pd.concat(ys_num).reset_index(drop=True)
         m = XGBRegressor(**XGB_PARAMS); m.fit(X_tr, y_tr)
+        models = m
 
     print(f"    Trained on {len(X_tr):,} samples ({time.time() - t0:.1f}s)")
 
     # ── Evaluate synthetic gaps in each held-out station ──────────────────
     for ws in EVAL_STATIONS:
         truth = np.asarray(pivots[v][ws].values, dtype=float)
-        # Valid positions after Stage 1 (use original truth for eval)
-        valid_pos = np.where(np.isfinite(truth))[0]
-        if len(valid_pos) < max(BLOCK_LENGTHS) + 20:
+        if np.isfinite(truth).sum() < max(BLOCK_LENGTHS) + 20:
             continue
-
         X_ws = make_features(ws, s1_pivots, wd_sin_s1, wd_cos_s1)
 
+        def baseline(start, bl):
+            # station mean with the synthetic gap removed (as for a real gap)
+            keep = np.ones(len(truth), bool); keep[start:start + bl] = False
+            return float(np.nanmean(truth[keep]))
+
+        # Table 7: long-gap LOSO metrics
         for bl in BLOCK_LENGTHS:
-            # All start positions where bl consecutive values are valid
-            cumv = np.concatenate([[0], np.cumsum(np.isfinite(truth).astype(int))])
-            window_valid = cumv[bl:] - cumv[:-bl]
-            possible = [i for i in np.where(window_valid == bl)[0]
-                        if i >= 5 and i + bl <= len(truth) - 5]
-            if not possible:
-                continue
-
+            starts = sample_gaps(truth, bl, N_BLOCKS, rng)
             maes, rmses, mbes, r2s = [], [], [], []
-            chosen_ranges = []
-
-            for _ in range(N_BLOCKS * 20):
-                if len(maes) >= N_BLOCKS:
-                    break
-                start = int(rng.choice(possible))
-                # Non-overlap check
-                if any(max(start, s) < min(start + bl, e) for s, e in chosen_ranges):
-                    continue
-                chosen_ranges.append((start, start + bl))
-
-                gap_ts  = FULL_IDX[start:start + bl]
-                y_true  = truth[start:start + bl]
-                X_gap   = X_ws.loc[gap_ts]
-
+            for start in starts:
+                gap_ts = FULL_IDX[start:start + bl]
+                y_true = truth[start:start + bl]
+                y_pred = predict_gap(v, models, X_ws.loc[gap_ts], baseline(start, bl))
                 if is_wd:
-                    ps = m_sin.predict(X_gap)
-                    pc = m_cos.predict(X_gap)
-                    y_pred = np.degrees(np.arctan2(ps, pc)) % 360
                     maes.append(circ_mae_deg(y_true, y_pred))
                 else:
-                    y_pred = m.predict(X_gap) + station_means[ws][v]
                     met = compute_metrics(y_true, y_pred)
-                    maes.append(met["MAE"])
-                    rmses.append(met["RMSE"])
-                    mbes.append(met["MBE"])
-                    r2s.append(met["R2"])
-
+                    maes.append(met["MAE"]); rmses.append(met["RMSE"])
+                    mbes.append(met["MBE"]); r2s.append(met["R2"])
             if not maes:
                 continue
-
             rec = {
                 "Variable": v, "Station": ws, "BlockLength_h": bl,
                 "N_blocks": len(maes),
@@ -414,7 +445,31 @@ for v in ALL_VARS:
             print(f"    {ws} | {bl:4d}h | MAE={rec['MAE']:.4f}  "
                   f"RMSE={rmse_str}  MBE={mbe_str}  R²={r2_str}")
 
+        # Stage 1 validation: linear interpolation vs Stage 2 on identical gaps
+        for bl in SHORT_BLOCKS:
+            for start in sample_gaps(truth, bl, N_BLOCKS_SHORT, rng_short):
+                gap_ts = FULL_IDX[start:start + bl]
+                y_true = truth[start:start + bl]
+                v_lo, v_hi = truth[start - 1], truth[start + bl]
+                frac = np.arange(1, bl + 1) / (bl + 1)
+                y_xgb = predict_gap(v, models, X_ws.loc[gap_ts], baseline(start, bl))
+                if is_wd:
+                    diff = ((v_hi - v_lo + 180) % 360) - 180
+                    y_lin = (v_lo + frac * diff) % 360
+                    err_lin = np.abs(((y_lin - y_true + 180) % 360) - 180)
+                    err_xgb = np.abs(((y_xgb - y_true + 180) % 360) - 180)
+                else:
+                    y_lin = v_lo + frac * (v_hi - v_lo)
+                    err_lin = np.abs(y_lin - y_true)
+                    err_xgb = np.abs(y_xgb - y_true)
+                s1_records.append({
+                    "Variable": v, "Station": ws, "GapLength_h": bl, "Start": str(FULL_IDX[start]),
+                    "Linear_MAE": float(err_lin.mean()), "Linear_MSE": float((err_lin ** 2).mean()),
+                    "XGBoost_MAE": float(err_xgb.mean()), "XGBoost_MSE": float((err_xgb ** 2).mean()),
+                })
+
 eval_df = pd.DataFrame(eval_records)
+s1_df   = pd.DataFrame(s1_records)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 5 — Train final models on all 40 stations
@@ -430,8 +485,6 @@ for v in ALL_VARS:
     Xs, ys_sin, ys_cos, ys_num = [], [], [], []
 
     for ws in stations:
-        if v == "AtmPress Ave (hPa)" and ws == PRESSURE_OUTLIER:
-            continue
         valid = ~pivots[v][ws].isna()
         if valid.sum() < 50:
             continue
@@ -466,8 +519,7 @@ print("Applying imputation to actual gaps …")
 
 final_pivots = {v: s1_pivots[v].copy() for v in ALL_VARS}
 
-# Track imputed positions (0 = observed/Stage1-interp, 1 = Stage2-XGBoost)
-# Stage 1 fills are marked with flag=1 to indicate they are not original observations
+# Flags: 0 = observed, 1 = Stage 1, 2 = Stage 2, 3 = not measured / not imputed
 flag_pivots = {}
 for v in ALL_VARS:
     flags = pd.DataFrame(0, index=FULL_IDX, columns=stations, dtype=np.int8)
@@ -478,17 +530,24 @@ for v in ALL_VARS:
     flag_pivots[v] = flags
 
 s2_counts = {v: 0 for v in ALL_VARS}
+s3_counts = {v: 0 for v in ALL_VARS}
+not_imputed = []          # (station, variable) left missing, flag 3
 
 for ws in stations:
     X_ws = make_features(ws, s1_pivots, wd_sin_s1, wd_cos_s1)
 
     for v in ALL_VARS:
-        if v == "AtmPress Ave (hPa)" and ws == PRESSURE_OUTLIER:
-            continue
         is_wd = (v == VAR_WD)
 
         still_missing = s1_pivots[v][ws].isna()
         if not still_missing.any():
+            continue
+
+        # Too little data to anchor the station: leave missing, flag 3
+        if pivots[v][ws].notna().mean() < MIN_VALID_FRACTION:
+            flag_pivots[v].loc[still_missing, ws] = 3
+            s3_counts[v] += int(still_missing.sum())
+            not_imputed.append((ws, v))
             continue
 
         gap_ts = FULL_IDX[still_missing]
@@ -523,8 +582,6 @@ any_warning = False
 
 for ws in stations:
     for v in VARS_NUMERIC:
-        if v == "AtmPress Ave (hPa)" and ws == PRESSURE_OUTLIER:
-            continue
         s2_mask    = flag_pivots[v][ws] == 2
         imp_vals   = final_pivots[v][ws][s2_mask]
         if len(imp_vals) == 0:
@@ -563,25 +620,42 @@ for ws in stations:
 
     for v in ALL_VARS:
         df_out[v] = final_pivots[v][ws]
-        # Flag: 0=original, 1=Stage1 linear interp, 2=Stage2 XGBoost
+        # Flag: 0=original, 1=Stage1 linear interp, 2=Stage2 XGBoost, 3=not imputed
         df_out[FLAG_COL[v]] = flag_pivots[v][ws].values
-
-    # WS17 AtmPress: flag stays 0 (not imputed)
-    if ws == PRESSURE_OUTLIER:
-        df_out[FLAG_COL["AtmPress Ave (hPa)"]] = 0
 
     df_out.index.name = "Datetime"
     out_path = os.path.join(OUT_DIR, f"NUS_CAMPUS_{ws}_2025_Hourly_imputed.csv")
     df_out.to_csv(out_path)
 
 print(f"  Saved {len(stations)} files.")
-print(f"  Flag column values: 0=original, 1=Stage1 linear, 2=Stage2 XGBoost")
+print(f"  Flag column values: 0=original, 1=Stage1 linear, 2=Stage2 XGBoost, 3=not imputed")
 
 # ── Save evaluation and plausibility tables ────────────────────────────────
 eval_path  = os.path.join(RESULT_DIR, "imputation_evaluation.csv")
 plaus_path = os.path.join(RESULT_DIR, "imputation_plausibility.csv")
+s1_path    = os.path.join(RESULT_DIR, "stage1_validation.csv")
 eval_df.to_csv(eval_path, index=False)
 pd.DataFrame(plaus_records).to_csv(plaus_path, index=False)
+s1_df.to_csv(s1_path, index=False)
+
+# Summaries used in the paper
+eval_sum = (eval_df.groupby(["Variable", "BlockLength_h"])[["MAE", "RMSE", "MBE", "R2"]]
+            .mean().round(4).reset_index())
+eval_sum.to_csv(os.path.join(RESULT_DIR, "imputation_evaluation_summary.csv"), index=False)
+g = s1_df.groupby(["Variable", "GapLength_h"])
+s1_sum = pd.DataFrame({
+    "N_gaps": g.size(),
+    "Linear_MAE": g["Linear_MAE"].mean(), "Linear_RMSE": np.sqrt(g["Linear_MSE"].mean()),
+    "XGBoost_MAE": g["XGBoost_MAE"].mean(), "XGBoost_RMSE": np.sqrt(g["XGBoost_MSE"].mean()),
+}).round(4).reset_index()
+s1_sum.to_csv(os.path.join(RESULT_DIR, "stage1_validation_summary.csv"), index=False)
+counts = pd.DataFrame({
+    "Variable": ALL_VARS,
+    "Stage1_linear": [s1_counts[v] for v in ALL_VARS],
+    "Stage2_xgboost": [s2_counts[v] for v in ALL_VARS],
+    "Not_imputed_flag3": [s3_counts[v] for v in ALL_VARS],
+})
+counts.to_csv(os.path.join(RESULT_DIR, "imputation_counts.csv"), index=False)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 9 — Report
@@ -629,23 +703,23 @@ print(f"{'Stn':<6}" + "".join(f"  {v.split()[0]:>9}" for v in ALL_VARS))
 for ws in stations:
     row = f"{ws:<6}"
     for v in ALL_VARS:
-        if v == "AtmPress Ave (hPa)" and ws == PRESSURE_OUTLIER:
-            row += f"  {'excl':>9}"
-        else:
-            pct = final_pivots[v][ws].notna().sum() / 8760 * 100
-            row += f"  {pct:>8.2f}%"
+        pct = final_pivots[v][ws].notna().sum() / 8760 * 100
+        row += f"  {pct:>8.2f}%"
     print(row)
 
+total_s1, total_s2 = sum(s1_counts.values()), sum(s2_counts.values())
+n_values = len(stations) * 8760 * len(ALL_VARS)
 print(f"\n{'=' * 70}")
 print("IMPUTATION VOLUME SUMMARY")
 print(f"{'=' * 70}")
-print(f"  Stage 1 (linear interp)  : {sum(s1_counts.values()):>8,} values")
-print(f"  Stage 2 (XGBoost spatial): {sum(s2_counts.values()):>8,} values")
-print(f"  Total filled             : {sum(s1_counts.values()) + sum(s2_counts.values()):>8,} values")
+print(f"  Stage 1 (linear interp)  : {total_s1:>8,} values")
+print(f"  Stage 2 (XGBoost spatial): {total_s2:>8,} values")
+print(f"  Total filled             : {total_s1 + total_s2:>8,} values "
+      f"({(total_s1 + total_s2) / n_values * 100:.2f}% of {n_values:,} hourly values)")
+print(f"  Not imputed (flag 3)     : {sum(s3_counts.values()):>8,} values  {not_imputed}")
 print(f"\nOutputs:")
 print(f"  Imputed CSVs : {OUT_DIR}/")
 print(f"  LOSO metrics : {eval_path}")
+print(f"  Stage 1 test : {s1_path}")
 print(f"  Plausibility : {plaus_path}")
-print(f"\nNote: WS17 AtmPress retained as NaN (faulty sensor — not imputed).")
-print(f"Note: WS38 GlobalRad imputed from spatial model only (0% original data).")
 print(f"\nPipeline complete.")

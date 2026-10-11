@@ -1,0 +1,34 @@
+Station,Variable,Start,End,N_values,Rule,Reason
+WS01,WindSpeed Ave (m/s),2025-09-13 23:00:00,2025-09-14 01:00:00,3,W1,Wind speed and direction unchanged for >= 3 h (stale record)
+WS01,WindDir Ave (degrees),2025-09-13 23:00:00,2025-09-14 01:00:00,3,W1,Wind speed and direction unchanged for >= 3 h (stale record)
+WS03,WindSpeed Ave (m/s),2025-06-19 18:00:00,2025-10-31 05:00:00,7,W1,Wind speed and direction unchanged for >= 3 h (stale record)
+WS03,WindDir Ave (degrees),2025-06-19 18:00:00,2025-10-31 05:00:00,7,W1,Wind speed and direction unchanged for >= 3 h (stale record)
+WS07,GlobalRad Ave (W/m2),2025-09-01 00:00:00,2025-09-30 23:00:00,604,G2,Night-time irradiance 95th percentile 200 W m-2 in this month; channel corrupted
+WS07,GlobalRad Ave (W/m2),2025-10-01 00:00:00,2025-10-31 23:00:00,672,G2,Night-time irradiance 95th percentile 319 W m-2 in this month; channel corrupted
+WS07,GlobalRad Ave (W/m2),2025-11-01 00:00:00,2025-11-30 23:00:00,559,G2,Night-time irradiance 95th percentile 445 W m-2 in this month; channel corrupted
+WS07,GlobalRad Ave (W/m2),2025-12-01 00:00:00,2025-12-31 23:00:00,740,G2,Night-time irradiance 95th percentile 472 W m-2 in this month; channel corrupted
+WS07,GlobalRad Ave (W/m2),2025-02-14 21:00:00,2025-08-27 06:00:00,177,G3,Night-time irradiance above 20 W m-2
+WS17,AtmPress Ave (hPa),2025-01-01 00:00:00,2025-04-30 11:00:00,2868,P1,Pressure outside 950-1050 hPa (sensor fault)
+WS17,WindSpeed Ave (m/s),2025-12-07 14:00:00,2025-12-28 12:00:00,163,W1,Wind speed and direction unchanged for >= 3 h (stale record)
+WS17,WindDir Ave (degrees),2025-12-07 14:00:00,2025-12-28 12:00:00,163,W1,Wind speed and direction unchanged for >= 3 h (stale record)
+WS17,WindSpeed Ave (m/s),2025-12-21 06:00:00,2025-12-26 08:00:00,19,M1,Anemometer malfunction: repeated stale records and implausible hourly means up to 17 m/s at a sheltered ground-level station
+WS17,WindDir Ave (degrees),2025-12-21 06:00:00,2025-12-26 08:00:00,19,M1,Anemometer malfunction: repeated stale records and implausible hourly means up to 17 m/s at a sheltered ground-level station
+WS19,GlobalRad Ave (W/m2),2025-02-01 00:00:00,2025-02-28 23:00:00,672,G2,Night-time irradiance 95th percentile 801 W m-2 in this month; channel corrupted
+WS19,GlobalRad Ave (W/m2),2025-03-01 00:00:00,2025-03-31 23:00:00,744,G2,Night-time irradiance 95th percentile 811 W m-2 in this month; channel corrupted
+WS23,GlobalRad Ave (W/m2),2025-03-01 00:00:00,2025-03-31 23:00:00,520,G2,Night-time irradiance 95th percentile 1482 W m-2 in this month; channel corrupted
+WS23,GlobalRad Ave (W/m2),2025-04-01 00:00:00,2025-04-30 22:00:00,567,G2,Night-time irradiance 95th percentile 1470 W m-2 in this month; channel corrupted
+WS23,GlobalRad Ave (W/m2),2025-05-01 11:00:00,2025-05-31 23:00:00,551,G2,Night-time irradiance 95th percentile 1466 W m-2 in this month; channel corrupted
+WS23,GlobalRad Ave (W/m2),2025-06-01 00:00:00,2025-06-30 23:00:00,566,G2,Night-time irradiance 95th percentile 1385 W m-2 in this month; channel corrupted
+WS23,GlobalRad Ave (W/m2),2025-07-01 01:00:00,2025-07-31 23:00:00,594,G2,Night-time irradiance 95th percentile 1393 W m-2 in this month; channel corrupted
+WS23,GlobalRad Ave (W/m2),2025-08-01 00:00:00,2025-08-31 23:00:00,542,G2,Night-time irradiance 95th percentile 1444 W m-2 in this month; channel corrupted
+WS23,GlobalRad Ave (W/m2),2025-09-01 00:00:00,2025-09-30 23:00:00,534,G2,Night-time irradiance 95th percentile 1471 W m-2 in this month; channel corrupted
+WS26,GlobalRad Ave (W/m2),2025-05-01 00:00:00,2025-05-31 23:00:00,744,G2,Night-time irradiance 95th percentile 101 W m-2 in this month; channel corrupted
+WS26,GlobalRad Ave (W/m2),2025-08-01 00:00:00,2025-08-31 23:00:00,744,G2,Night-time irradiance 95th percentile 110 W m-2 in this month; channel corrupted
+WS26,GlobalRad Ave (W/m2),2025-09-01 00:00:00,2025-09-30 23:00:00,717,G2,Night-time irradiance 95th percentile 254 W m-2 in this month; channel corrupted
+WS26,GlobalRad Ave (W/m2),2025-10-01 00:00:00,2025-10-31 23:00:00,700,G2,Night-time irradiance 95th percentile 293 W m-2 in this month; channel corrupted
+WS26,GlobalRad Ave (W/m2),2025-11-01 00:00:00,2025-11-30 23:00:00,677,G2,Night-time irradiance 95th percentile 267 W m-2 in this month; channel corrupted
+WS26,GlobalRad Ave (W/m2),2025-12-01 00:00:00,2025-12-31 23:00:00,716,G2,Night-time irradiance 95th percentile 268 W m-2 in this month; channel corrupted
+WS26,GlobalRad Ave (W/m2),2025-01-01 04:00:00,2025-07-30 06:00:00,149,G3,Night-time irradiance above 20 W m-2
+WS32,GlobalRad Ave (W/m2),2025-01-01 00:00:00,2025-12-31 23:00:00,7836,G1,No diurnal cycle (day-night median difference -3 W m-2); pyranometer non-functional
+WS35,GlobalRad Ave (W/m2),2025-02-07 21:00:00,2025-02-07 21:00:00,1,G3,Night-time irradiance above 20 W m-2
+WS39,GlobalRad Ave (W/m2),2025-01-01 00:00:00,2025-12-31 23:00:00,8658,G1,No diurnal cycle (day-night median difference -17 W m-2); pyranometer non-functional

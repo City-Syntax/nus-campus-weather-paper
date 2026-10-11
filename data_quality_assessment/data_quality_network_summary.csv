@@ -1,0 +1,8 @@
+Variable,Network_mean_valid_%,Network_min_valid_%,Station_with_min,N_stations_below_90%,N_stations_without_data
+WindSpeed Ave (m/s),95.66,73.41,WS11,7,0
+WindDir Ave (degrees),95.66,73.41,WS11,7,0
+AirTemp Ave (C),95.71,73.41,WS11,7,0
+RelHum Ave (%),95.71,73.41,WS11,7,0
+AtmPress Ave (hPa),94.89,57.09,WS17,7,0
+GlobalRad Ave (W/m2),84.57,0.0,WS32,12,3
+All variables,93.7,0.0,,,

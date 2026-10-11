@@ -1,3 +1,10 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 1_data_quality_check.py
+# Timestamp and variable completeness of the quality-controlled hourly files
+# (run 0_quality_control.py first). Outputs to data_quality_assessment/.
+#   Timestamp completeness: % of the 8,760 expected hourly timestamps present.
+#   Variable completeness : % of the 8,760 expected hours with a valid value.
+# ─────────────────────────────────────────────────────────────────────────────
 import pandas as pd
 import glob
 import os
@@ -37,7 +44,7 @@ for fpath in FILES:
     rec = {
         "Station": ws,
         "Total_Rows": n_rows,
-        "Row_Completeness_%": round(row_completeness, 2),
+        "Timestamp_Completeness_%": round(row_completeness, 2),
         "Missing_Timestamps": n_missing_ts,
         "Duplicate_Timestamps": n_dupes,
     }
@@ -53,7 +60,29 @@ for fpath in FILES:
     records.append(rec)
 
 summary = pd.DataFrame(records)
-summary.to_csv(os.path.join(ROOT, "results", "data_quality_summary.csv"), index=False)
+OUT_DIR = os.path.join(ROOT, "data_quality_assessment")
+os.makedirs(OUT_DIR, exist_ok=True)
+summary.to_csv(os.path.join(OUT_DIR, "data_quality_summary.csv"), index=False)
+
+# Network-level summary per variable (Table 4 of the paper)
+net = []
+for col in DATA_COLS:
+    vcol = f"{col.split(' ')[0]}_Valid_%"
+    v = summary[vcol]
+    net.append({
+        "Variable": col,
+        "Network_mean_valid_%": round(v.mean(), 2),
+        "Network_min_valid_%": round(v.min(), 2),
+        "Station_with_min": summary.loc[v.idxmin(), "Station"],
+        "N_stations_below_90%": int((v < 90).sum()),
+        "N_stations_without_data": int((v == 0).sum()),
+    })
+net = pd.DataFrame(net)
+all_valid = summary[[c for c in summary.columns if c.endswith("_Valid_%")]].values
+net.loc[len(net)] = {"Variable": "All variables", "Network_mean_valid_%": round(all_valid.mean(), 2),
+                     "Network_min_valid_%": round(all_valid.min(), 2), "Station_with_min": "",
+                     "N_stations_below_90%": "", "N_stations_without_data": ""}
+net.to_csv(os.path.join(OUT_DIR, "data_quality_network_summary.csv"), index=False)
 
 # --- Print report ---
 pd.set_option("display.max_columns", None)
@@ -64,9 +93,9 @@ print("DATA QUALITY SUMMARY — NUS CAMPUS 40 WEATHER STATIONS 2025")
 print(f"Expected hours per station: {EXPECTED_HOURS}")
 print("=" * 80)
 
-# Row completeness
-print("\n--- ROW COMPLETENESS (per station) ---")
-row_cols = ["Station", "Total_Rows", "Row_Completeness_%", "Missing_Timestamps", "Duplicate_Timestamps"]
+# Timestamp completeness
+print("\n--- TIMESTAMP COMPLETENESS (per station) ---")
+row_cols = ["Station", "Total_Rows", "Timestamp_Completeness_%", "Missing_Timestamps", "Duplicate_Timestamps"]
 print(summary[row_cols].to_string(index=False))
 
 # Variable completeness
@@ -76,7 +105,8 @@ print(summary[var_cols].to_string(index=False))
 
 # Network-level summary
 print("\n--- NETWORK-LEVEL SUMMARY ---")
-print(f"Stations with 100% row completeness : {(summary['Row_Completeness_%'] == 100).sum()} / {len(summary)}")
+print(f"Network-mean timestamp completeness : {summary['Timestamp_Completeness_%'].mean():.2f}%")
+print(f"Stations with 100% timestamp completeness : {(summary['Timestamp_Completeness_%'] == 100).sum()} / {len(summary)}")
 print(f"Stations with any missing timestamps : {(summary['Missing_Timestamps'] > 0).sum()} / {len(summary)}")
 print(f"Stations with duplicate timestamps  : {(summary['Duplicate_Timestamps'] > 0).sum()} / {len(summary)}")
 print()
@@ -89,4 +119,6 @@ for col in DATA_COLS:
         min_ws = summary.loc[summary[vcol].idxmin(), "Station"]
         print(f"  {col:<30}  mean valid: {mean_v:.2f}%   min: {min_v:.2f}% ({min_ws})")
 
-print("\nFull summary saved to: data_quality_summary.csv")
+print()
+print(net.to_string(index=False))
+print("\nSaved: data_quality_assessment/data_quality_summary.csv, data_quality_network_summary.csv")

@@ -1,0 +1,7 @@
+Variable,Stage1_linear,Stage2_xgboost,Not_imputed_flag3
+AirTemp Ave (C),128,14891,0
+RelHum Ave (%),128,14891,0
+WindSpeed Ave (m/s),893,14318,0
+AtmPress Ave (hPa),0,17887,0
+GlobalRad Ave (W/m2),323,27446,26280
+WindDir Ave (degrees),893,14318,0

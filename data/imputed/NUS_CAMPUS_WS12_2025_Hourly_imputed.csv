@@ -1,4 +1,4 @@
-Datetime,Latitude,Longitude,Elevation,Type,WindSpeed Ave (m/s),WindDir Ave (degrees),AirTemp Ave (C),RelHum Ave (%),AtmPress Ave (hPa),GlobalRad Ave (W/m2),AirTemp_flag,RelHum_flag,WindSpeed_flag,AtmPress_flag,GlobalRad_flag,WindDir_flag
+Datetime,Latitude,Longitude,Elevation (m),Type,WindSpeed Ave (m/s),WindDir Ave (degrees),AirTemp Ave (C),RelHum Ave (%),AtmPress Ave (hPa),GlobalRad Ave (W/m2),AirTemp_flag,RelHum_flag,WindSpeed_flag,AtmPress_flag,GlobalRad_flag,WindDir_flag
 2025-01-01 00:00:00,1.294852,103.771604,50.702,Roof,1.019968725895395,24.66704274376258,25.690677966101696,92.27627118644068,1006.3016949152542,0.0,0,0,0,0,0,0
 2025-01-01 01:00:00,1.294852,103.771604,50.702,Roof,1.0734241316023592,10.34045474572099,25.700166666666668,92.23833333333332,1005.9416666666668,0.0,0,0,0,0,0,0
 2025-01-01 02:00:00,1.294852,103.771604,50.702,Roof,1.1134574029754554,17.69823978411597,25.526333333333334,92.77,1005.235,0.0,0,0,0,0,0,0

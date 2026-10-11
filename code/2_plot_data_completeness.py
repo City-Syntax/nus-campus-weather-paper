@@ -13,7 +13,17 @@ import os
 import calendar
 
 # ── Typography & global style ─────────────────────────────────────────────────
-FONT = "Palatino Linotype"
+from matplotlib import font_manager as _fm
+
+
+def _pick_font(cands=("Palatino Linotype", "Palatino", "TeX Gyre Pagella",
+                      "URW Palladio L", "P052")):
+    """Palatino on Windows/macOS; metric-compatible clone elsewhere."""
+    have = {f.name for f in _fm.fontManager.ttflist}
+    return next((c for c in cands if c in have), "serif")
+
+
+FONT = _pick_font()
 plt.rcParams.update({
     "font.family":        FONT,
     "axes.spines.top":    False,
@@ -128,9 +138,15 @@ pad_lon, pad_lat = 0.004, 0.004
 ax1.set_xlim(min(orig_lons) - pad_lon, max(orig_lons) + pad_lon)
 ax1.set_ylim(min(orig_lats) - pad_lat, max(orig_lats) + pad_lat)
 
-ctx.add_basemap(ax1, crs="EPSG:4326",
+try:  # basemap tiles need internet access; figure still renders without
+
+    ctx.add_basemap(ax1, crs="EPSG:4326",
                 source=ctx.providers.CartoDB.Positron,
                 alpha=0.45, zorder=0, attribution=False)
+
+except Exception as e:
+
+    print(f'  basemap skipped: {e}')
 
 sc = ax1.scatter(
     plot_lons, plot_lats, s=sizes, c=vals,

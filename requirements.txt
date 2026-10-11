@@ -1,0 +1,9 @@
+# Versions used to produce release v1.1.0 (Python 3.13.16).
+# XGBoost results can differ slightly across versions; pin to reproduce exactly.
+pandas==3.0.5
+numpy==2.5.3
+scipy==1.18.1
+xgboost==3.4.1
+matplotlib==3.11.2
+seaborn==0.13.2
+contextily==1.7.1   # optional: basemap tiles for the additional map figures

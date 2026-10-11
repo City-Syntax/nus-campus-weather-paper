@@ -14,7 +14,17 @@ warnings.filterwarnings('ignore')
 import glob, os, calendar
 
 # ── Style ─────────────────────────────────────────────────────────────────────
-FONT = "Palatino Linotype"
+from matplotlib import font_manager as _fm
+
+
+def _pick_font(cands=("Palatino Linotype", "Palatino", "TeX Gyre Pagella",
+                      "URW Palladio L", "P052")):
+    """Palatino on Windows/macOS; metric-compatible clone elsewhere."""
+    have = {f.name for f in _fm.fontManager.ttflist}
+    return next((c for c in cands if c in have), "serif")
+
+
+FONT = _pick_font()
 plt.rcParams.update({
     "font.family":       FONT,
     "figure.dpi":        150,
@@ -37,7 +47,9 @@ VARS = [
     ("WindDir Ave (degrees)", "Wind Direction",    "°",     VAR_COLORS[5]),
 ]
 
-PRESSURE_OUTLIER = "WS17"
+# Faulty WS17 pressure (Jan–Apr) is removed by 0_quality_control.py, so no
+# station is excluded any more; set a station ID here to exclude one.
+PRESSURE_OUTLIER = ""
 R_IN,  R_OUT = 0.30, 0.90    # inner / outer radius of data ring
 
 GAUGE_STATIONS = ['WS02', 'WS16', 'WS35']
@@ -267,8 +279,8 @@ VAR_CFG = {
         has_band=True, show_mean=True, daytime_only=False,
     ),
     "AtmPress Ave (hPa)": dict(
-        center=["Atm. Pressure", "(hPa)", "WS17 excluded", "inner=min, outer=max"],
-        line_label="Network daily mean (WS17 excl.)",
+        center=["Atm. Pressure", "(hPa)", "inner=min, outer=max"],
+        line_label="Network daily mean",
         has_band=True, show_mean=True, daytime_only=False,
     ),
     "GlobalRad Ave (W/m2)": dict(
@@ -603,7 +615,7 @@ FIG9A_VARS = [
     dict(col="WindSpeed Ave (m/s)",   label="Wind Speed",        unit="m/s",  lc=VAR_COLORS[2],
          fname="WindSpeed", daytime_only=False, excl_ws17=False),
     dict(col="AtmPress Ave (hPa)",    label="Atm. Pressure",     unit="hPa",  lc=VAR_COLORS[3],
-         fname="AtmPress",  daytime_only=False, excl_ws17=True),
+         fname="AtmPress",  daytime_only=False, excl_ws17=bool(PRESSURE_OUTLIER)),
     dict(col="GlobalRad Ave (W/m2)",  label="Solar Radiation",   unit="W/m²", lc=VAR_COLORS[4],
          fname="SolarRad",  daytime_only=True,  excl_ws17=False),
     dict(col="WindDir Ave (degrees)", label="Wind Direction",    unit="°",    lc=VAR_COLORS[5],
@@ -729,7 +741,7 @@ for vcfg in FIG9A_VARS:
     else:
         scale_str = f"Consistent scale: {vmin_b:.1f}–{vmax_b:.1f} {unit}"
         sol_note  = "  ·  Mean line = daytime hours (07–18h)" if is_solar else ""
-        ws17_note = "  ·  WS17 excluded (faulty sensor)" if vcfg["excl_ws17"] else ""
+        ws17_note = f"  ·  {PRESSURE_OUTLIER} excluded (faulty sensor)" if vcfg["excl_ws17"] else ""
         subtitle  = (f"Annual {label} Radials — NUS Campus (2025)  |  "
                      f"One panel per weather station\n"
                      f"Jan at top, clockwise  ·  Dot colour = hour of day  ·  "
