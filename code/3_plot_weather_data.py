@@ -7,12 +7,16 @@ import matplotlib.cm as cm
 from matplotlib.gridspec import GridSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-from matplotlib.ticker import FormatStrFormatter
-from matplotlib.colors import Normalize
+from matplotlib.ticker import FormatStrFormatter, StrMethodFormatter
+from matplotlib.colors import Normalize, ListedColormap
 from matplotlib.cm import ScalarMappable
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import seaborn as sns
 import contextily as ctx
+import cartopy.crs as ccrs
+import cartopy.io.img_tiles as cimgt
 import glob, os, calendar
+import windrose
 
 # ── Style ─────────────────────────────────────────────────────────────────────
 from matplotlib import font_manager as _fm
@@ -44,6 +48,8 @@ TWILIGHT  = cm.twilight_shifted
 MONTH_LABELS = [calendar.month_abbr[m] for m in range(1, 13)]
 
 VAR_COLORS = [VIRIDIS(x) for x in np.linspace(0.08, 0.92, 6)]
+
+MAPBOX_APIKEY = None
 
 # ── Variable definitions ──────────────────────────────────────────────────────
 # (col, short_label, unit, line_color, fig6/fig10_cmap)
@@ -151,6 +157,12 @@ def draw_station_windrose(ax, lon, lat, ws_series, wd_series,
 
     ax.scatter([lon], [lat], s=5, c="white", zorder=6, linewidths=0)
 
+def getWSid(num):
+    if num >= 10:
+        return "WS"+str(num)
+    else:
+        return "WS0"+str(num)
+
 # ═════════════════════════════════════════════════════════════════════════════
 # Fig 6 — Diurnal × Seasonal Climatology  (Ladybug-style horizontal strips)
 # ═════════════════════════════════════════════════════════════════════════════
@@ -229,9 +241,9 @@ print(f"Saved: {out6}")
 plt.close(fig6)
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Fig 4 — Network Envelope Time Series  (monthly, with median)
+# Fig 7 — Network Envelope Time Series  (monthly, with median)
 # ═════════════════════════════════════════════════════════════════════════════
-print("Building Fig 4...")
+print("Building Fig 7...")
 
 fig7, axes4 = plt.subplots(5, 2, figsize=(15, 12), sharex=True)
 fig7.patch.set_facecolor("white")
@@ -365,7 +377,98 @@ print(f"Saved: {out7}")
 plt.close(fig7)
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Fig 10 — Spatial Variability Maps  (5 panels: Wind Dir removed — encoded in rose)
+# Fig 8 — Windrose
+# ═════════════════════════════════════════════════════════════════════════════
+print("Building Fig 8...")
+fig8 = plt.figure(figsize=(32, 12))
+minlon, maxlon, minlat, maxlat = (103.7685, 103.784, 1.2885, 1.31)
+proj = ccrs.PlateCarree()
+
+main_ax_ground = fig8.add_subplot(1, 2, 1, projection=proj)
+main_ax_ground.set_extent([minlon, maxlon, minlat, maxlat], crs=proj)
+plt.setp(main_ax_ground.spines.values(), linewidth=0.5)
+main_ax_ground.set_title("Ground Stations", loc="left", fontsize=16)
+
+main_ax_roof = fig8.add_subplot(1, 1, 1, projection=proj)
+main_ax_roof.set_extent([minlon, maxlon, minlat, maxlat], crs=proj)
+plt.setp(main_ax_roof.spines.values(), linewidth=0.5)
+main_ax_roof.set_title("Rooftop Stations", loc="left", fontsize=16)
+
+try: 
+    request = cimgt.MapboxTiles(MAPBOX_APIKEY,"light-v11")
+    main_ax_ground.add_image(request, 16)
+    main_ax_roof.add_image(request, 16)
+except Exception as e:
+    print(f'  basemap skipped: {e}')
+
+bins = np.arange(0, 4, 1)
+colors = [ (115/255,238/255,220/255,1), (115/255,194/255,190/255,1), (119/255,104/255,133/255,1), (95/255,26/255,55/255,1) ]
+cmap = ListedColormap(colors)
+
+excl_stations = [3, 5, 21, 26, 29, 31, 38]
+wslist = [i for i in range(1,41) if i not in excl_stations]
+for i in wslist:
+    wsid = getWSid(i)
+    wsdf = all_df.copy()
+    wsdf = wsdf[wsdf["station"]==wsid]
+    wstype = wsdf['Type'].to_list()[0]
+    ws_lon = wsdf['Longitude'].to_list()[0]
+    ws_lat = wsdf['Latitude'].to_list()[0]
+
+    ax_curr = {}
+    if wstype == "Ground":
+        ax_curr = main_ax_ground
+    elif wstype.startswith("Roof"):
+        ax_curr = main_ax_roof
+
+    df.dropna(subset=["WindSpeed Ave (m/s)", "WindDir Ave (degrees)"])
+    windspeed = wsdf["WindSpeed Ave (m/s)"].values
+    winddir = wsdf["WindDir Ave (degrees)"].values
+
+    wrax_curr = inset_axes(
+        ax_curr,
+        width=0.8,
+        height=0.8,
+        loc="center",
+        bbox_to_anchor=(ws_lon, ws_lat),
+        bbox_transform=ax_curr.transData,
+        axes_class=windrose.WindroseAxes,
+    )
+    wrax_curr.bar(winddir, windspeed, normed=True, nsector=8, opening=1, cmap=cmap, bins=bins)
+    wrax_curr.tick_params(labelleft=False, labelbottom=False)
+    wrax_curr.set_yticks(np.arange(10, 60, step=10))
+    wrax_curr.set_yticklabels(np.arange(10, 60, step=10))
+    wrax_curr.yaxis.grid(alpha=0.2)
+    wrax_curr.xaxis.grid(alpha=0.4)
+    wrax_curr.set_facecolor((1, 1, 1, 0))
+    plt.setp(wrax_curr.spines.values(), linewidth=0.2)
+
+## LEGEND
+wrax_legend = inset_axes(
+    main_ax_roof,
+    width=2,  # size in inches
+    height=2,  # size in inches
+    bbox_to_anchor=(-0.04,-0.04,1,1),
+    axes_class=windrose.WindroseAxes,  # specify the class of the axe
+    bbox_transform=main_ax_roof.transAxes
+)
+sample_wd = [120,120,120,120,120,120,120,120,120,120,120,120, 270,270,270,270,270,270,270,270]
+sample_ws = [0,0,1,1,1,1,1,2,2,2,2,3, 0,0,1,1,1,2,2,3]
+wrax_legend.bar(sample_wd, sample_ws, normed=True, nsector=8, opening=1, cmap=cmap, bins=bins)
+wrax_legend.set_yticks(np.arange(10, 60, step=10))
+wrax_legend.set_yticklabels(np.arange(10, 60, step=10), fontsize="8")
+wrax_legend.yaxis.set_major_formatter(StrMethodFormatter("{x}%"))
+wrax_legend.yaxis.grid(alpha=0.2)
+wrax_legend.xaxis.grid(alpha=0.4)
+wrax_legend.set_legend(title="Wind Speed (m/s)", bbox_to_anchor=(0.4, -0.7))
+
+out8 = os.path.join(ROOT, "figures", "Fig8_WindRose_Map.png")
+fig8.savefig(out8, bbox_inches = "tight")
+print(f"Saved: {out8}")
+plt.close(fig8)
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Fig 11 — Spatial Variability Maps  (5 panels: Wind Dir removed — encoded in rose)
 #   Color = annual mean value  (unique colormap per variable)
 #   Size  = data completeness for that variable at each station
 #   Wind Speed panel = geographic mini wind roses (speed + direction)
@@ -497,4 +600,4 @@ fig10.savefig(out10, dpi=300, bbox_inches="tight")
 print(f"Saved: {out10}")
 plt.close(fig10)
 
-print("\nAll 3 figures complete.")
+print("\nAll figures complete.")
