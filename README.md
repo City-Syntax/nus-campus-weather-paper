@@ -188,7 +188,7 @@ python code/6_plot_imputation_examples.py  # → figures/Fig10
 
 ## 📄 Citation
 
-Lim, J. et al. *An hourly meteorological dataset from a high-density 40-station campus weather network in tropical Singapore.* Scientific Data (under review). Dataset: Zenodo, https://doi.org/10.5281/zenodo.20477760 (all versions).
+Lim, J. et al. *An hourly meteorological dataset from a high-density 40-station campus weather network in tropical Singapore.* Scientific Data (under review). Dataset: Zenodo, https://doi.org/10.5281/zenodo.23535609 (v1.1.0, the version described in the paper); all versions: https://doi.org/10.5281/zenodo.20477760.
 
 ---
 
