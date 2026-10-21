@@ -13,7 +13,7 @@ Hourly meteorological observations from a **40-station automatic weather station
 | Stations | 40 (WS01–WS40): 32 ground-level, 8 rooftop |
 | Coverage | 1 January – 31 December 2025 (8,760 hourly steps) |
 | Location | NUS main campus, Singapore (≈ 1.30°N, 103.78°E) |
-| Density | 26.7 stations/km² across ~150 hectares |
+| Density | 23.5 stations/km² across ~170 hectares |
 | Variables | Air temperature, relative humidity, atmospheric pressure, global horizontal irradiance, wind speed, wind direction; rainfall at WS02, WS16, WS35 |
 | Temporal resolution | 1 hour |
 | Timestamp completeness | 99.77% network mean; 34/40 stations at 100% |
@@ -52,7 +52,7 @@ nus-campus-weather-paper/
 │   ├── 0_quality_control.py             # Removes faulty values → data/raw/, qc_log.csv
 │   ├── 1_data_quality_check.py          # Completeness → data_quality_assessment/
 │   ├── 2_plot_data_completeness.py      # Fig 4
-│   ├── 3_plot_weather_data.py           # Fig 6, Fig 7
+│   ├── 3_plot_weather_data.py           # Fig 6, Fig 7, Fig 8
 │   ├── 4_plot_weather_radials.py        # Fig 5, Fig 9
 │   ├── 5_impute_missing_data.py         # Gap filling + validation → data/imputed/, data_quality_assessment/
 │   ├── 6_plot_imputation_examples.py    # Fig 10
@@ -65,7 +65,7 @@ nus-campus-weather-paper/
 └── README.md
 ```
 
-Figures 1–3 (photos and maps) and Figure 8 (wind-rose map) are static image files; Figure 8's plotting script is not yet in the repository. The additional map figures (`AddFig4a`, `AddFig11`) download a basemap at run time and are drawn without it when the tile server cannot be reached.
+Figures 1–3 (photos and maps) are static image files. Figure 8 (wind-rose map) is produced by `code/3_plot_weather_data.py`; its basemap uses Mapbox tiles and needs an access token (`MAPBOX_APIKEY` in the script), and the roses are drawn without the basemap otherwise. The additional map figures (`AddFig4a`, `AddFig11`) also download a basemap at run time (CartoDB tiles, which now require an API key) and are drawn without it when tiles are unavailable.
 
 ---
 
@@ -176,7 +176,7 @@ pip install -r requirements.txt
 python code/0_quality_control.py           # → data/raw/ (cleaned), data_quality_assessment/qc_log.csv
 python code/1_data_quality_check.py        # → data_quality_assessment/data_quality_*.csv
 python code/2_plot_data_completeness.py    # → figures/Fig4
-python code/3_plot_weather_data.py         # → figures/Fig6, Fig7
+python code/3_plot_weather_data.py         # → figures/Fig6, Fig7, Fig8
 python code/4_plot_weather_radials.py      # → figures/Fig5, Fig9
 python code/5_impute_missing_data.py       # → data/imputed/, data_quality_assessment/
 python code/6_plot_imputation_examples.py  # → figures/Fig10

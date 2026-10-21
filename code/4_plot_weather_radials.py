@@ -517,38 +517,26 @@ plt.close()
 print(f"  Saved: {OUT_CHART}")
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Fig 9 — Option A: 6 radials, network mean, all variables
+# Fig 9 — Option A: 5 radials, network mean (wind direction is shown per
+# station in Fig 8; a network-pooled rose is not meaningful at this scale)
 # ═════════════════════════════════════════════════════════════════════════════
 print("Building Fig 9 (Option A — network radials)...")
 
-fig9, axs6a = plt.subplots(2, 3, figsize=(18, 13),
-                              subplot_kw={"projection": "polar"})
+from matplotlib.gridspec import GridSpec as _GridSpec
+fig9 = plt.figure(figsize=(18, 13))
 fig9.patch.set_facecolor("white")
+_gs9 = _GridSpec(2, 6, figure=fig9)
+_slots9 = [_gs9[0, 0:2], _gs9[0, 2:4], _gs9[0, 4:6], _gs9[1, 1:3], _gs9[1, 3:5]]
+VARS9 = [v for v in VARS if v[0] != "WindDir Ave (degrees)"]
+axs9 = [fig9.add_subplot(sl, projection="polar") for sl in _slots9]
 
-for ax, (col, label, unit, lc) in zip(axs6a.flat, VARS):
+for ax, (col, label, unit, lc) in zip(axs9, VARS9):
     cfg = VAR_CFG[col]
     src = all_df.copy()
     if col == "AtmPress Ave (hPa)":
         src.loc[src["station"] == PRESSURE_OUTLIER, col] = np.nan
 
-    # ── Wind Direction: hourly-stratified wind rose (different geometry) ─────
-    if col == "WindDir Ave (degrees)":
-        draw_hourly_wind_rose(ax, src)
-        wr_handles = [
-            Patch(facecolor=HOUR_CMAP(0.0),       alpha=0.88, label="00h (midnight)"),
-            Patch(facecolor=HOUR_CMAP(12 / 23),   alpha=0.88, label="12h (noon)"),
-            Patch(facecolor=HOUR_CMAP(18 / 23),   alpha=0.88, label="18h (dusk)"),
-        ]
-        ax.legend(handles=wr_handles,
-                  title="Stacked by hour", title_fontsize=5.0,
-                  bbox_to_anchor=(0.5, -0.03), loc="upper center",
-                  fontsize=5.2, framealpha=0.92, edgecolor="#dddddd",
-                  fancybox=False, ncol=3, columnspacing=0.5,
-                  handlelength=0.9, handletextpad=0.4, borderpad=0.4,
-                  prop={"family": FONT})
-        continue   # skip the radial drawing below
-
-    # ── All other variables: annual radial ────────────────────────────────────
+    # ── Annual radial ─────────────────────────────────────────────────────────
     grp_m = src.groupby(["doy", "hour"])[col].mean().reset_index()
     grp_s = src.groupby(["doy", "hour"])[col].std().reset_index()
     grp_s[col] = grp_s[col].fillna(0)
@@ -583,7 +571,7 @@ sm_h = ScalarMappable(cmap=HOUR_CMAP, norm=Normalize(vmin=0, vmax=23))
 sm_h.set_array([])
 cax_a = fig9.add_axes([0.93, 0.14, 0.013, 0.72])
 cb_a  = fig9.colorbar(sm_h, cax=cax_a)
-cb_a.set_label("Hour of Day (all panels)", fontsize=8.5, fontfamily=FONT, labelpad=8)
+cb_a.set_label("Hour of Day", fontsize=8.5, fontfamily=FONT, labelpad=8)
 cb_a.set_ticks([0, 6, 12, 18, 23])
 cb_a.set_ticklabels(["00h", "06h", "12h", "18h", "23h"])
 cb_a.ax.tick_params(labelsize=8)
