@@ -112,6 +112,8 @@ Each variable gains a companion `_flag` column (e.g. `AirTemp_flag`):
 - **Atmospheric pressure, WS17 (Jan–Apr)** — sensor fault (readings of 460–478 hPa); removed. Values from June onward are valid.
 - **Wind, WS17 (December)** — anemometer malfunction: stalled records between 7 and 28 Dec, and implausible hourly means up to 17 m/s on 20–26 Dec; removed. Short runs of stalled wind records at WS01 and WS03 also removed.
 
+- **Rainfall, WS02, WS16, WS35** — the rain column reads 0 mm in the 1,180 hours in which the station recorded no other variable (536 h at WS02, 642 h at WS35, 2 h at WS16, mostly April–May). These hours are station outages; treat their rainfall as missing.
+
 Removed periods are then treated as ordinary gaps by the gap-filling pipeline (except the three irradiance stations above). The imputation procedure is described in the *Gap-filling methodology* section of the paper and implemented in `code/5_impute_missing_data.py`.
 
 ---
