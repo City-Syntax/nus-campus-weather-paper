@@ -65,7 +65,7 @@ nus-campus-weather-paper/
 └── README.md
 ```
 
-Figures 1–3 (photos and maps) are static image files. Figure 8 (wind-rose map) is produced by `code/3_plot_weather_data.py`; its basemap uses Mapbox tiles and needs an access token (`MAPBOX_APIKEY` in the script), and the roses are drawn without the basemap otherwise. The additional map figures (`AddFig4a`, `AddFig11`) also download a basemap at run time (CartoDB tiles, which now require an API key) and are drawn without it when tiles are unavailable.
+Figures 1–3 (photos and maps) are static image files. Figure 8 (wind-rose map) is produced by `code/3_plot_weather_data.py`; its basemap uses Mapbox tiles and needs an access token in the environment variable `MAPBOX_APIKEY`, and the roses are drawn without the basemap otherwise. The additional map figures (`AddFig4a`, `AddFig11`) also download a basemap at run time (CartoDB tiles, which now require an API key) and are drawn without it when tiles are unavailable.
 
 ---
 

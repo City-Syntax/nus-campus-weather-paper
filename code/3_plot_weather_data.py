@@ -49,7 +49,7 @@ MONTH_LABELS = [calendar.month_abbr[m] for m in range(1, 13)]
 
 VAR_COLORS = [VIRIDIS(x) for x in np.linspace(0.08, 0.92, 6)]
 
-MAPBOX_APIKEY = None
+MAPBOX_APIKEY = os.environ.get("MAPBOX_APIKEY")  # Mapbox access token for the Fig 8 basemap
 
 # ── Variable definitions ──────────────────────────────────────────────────────
 # (col, short_label, unit, line_color, fig6/fig10_cmap)
@@ -395,6 +395,8 @@ plt.setp(main_ax_roof.spines.values(), linewidth=0.5)
 main_ax_roof.set_title("Rooftop Stations", loc="left", fontsize=16)
 
 try: 
+    if not MAPBOX_APIKEY:
+        raise RuntimeError("set the MAPBOX_APIKEY environment variable")
     request = cimgt.MapboxTiles(MAPBOX_APIKEY,"light-v11")
     main_ax_ground.add_image(request, 16)
     main_ax_roof.add_image(request, 16)
