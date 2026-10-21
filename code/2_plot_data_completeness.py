@@ -349,7 +349,7 @@ ax4.tick_params(which="minor", length=0)
 for spine in ax4.spines.values():
     spine.set_linewidth(0.5)
 
-cbar3 = fig4b.colorbar(im, fraction=0.022, pad=0.015, aspect=35)
+cbar3 = fig4.colorbar(im, fraction=0.022, pad=0.015, aspect=35)
 cbar3.set_label("Mean per-variable completeness (%)", fontsize=12,
                 fontfamily=FONT, labelpad=10)
 cbar3.ax.tick_params(labelsize=10)

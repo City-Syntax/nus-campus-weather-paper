@@ -80,8 +80,8 @@ Figures 1–3 (photos and maps) are static image files. Figure 8 (wind-rose map)
 | `Longitude` | °E WGS84 | Station longitude (constant within file) |
 | `Elevation (m)` | m | Station height above sea level (constant within file) |
 | `Type` | – | Ground / Roof / Roof-3axis (constant within file) |
-| `WindSpeed Ave (m/s)` | m s⁻¹ | Hourly mean wind speed |
-| `WindDir Ave (degrees)` | ° | Hourly mean wind direction (0–360°) |
+| `WindSpeed Ave (m/s)` | m s⁻¹ | Hourly vector-mean wind speed (magnitude of the mean wind vector; lower than the scalar mean when the direction varies within the hour) |
+| `WindDir Ave (degrees)` | ° | Hourly vector-mean wind direction (0–360°) |
 | `AirTemp Ave (C)` | °C | Hourly mean air temperature |
 | `RelHum Ave (%)` | % | Hourly mean relative humidity |
 | `AtmPress Ave (hPa)` | hPa | Hourly mean atmospheric pressure |

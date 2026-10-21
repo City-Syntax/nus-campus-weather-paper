@@ -421,7 +421,7 @@ for i in wslist:
     elif wstype.startswith("Roof"):
         ax_curr = main_ax_roof
 
-    df.dropna(subset=["WindSpeed Ave (m/s)", "WindDir Ave (degrees)"])
+    wsdf = wsdf.dropna(subset=["WindSpeed Ave (m/s)", "WindDir Ave (degrees)"])  # roses as % of valid hours
     windspeed = wsdf["WindSpeed Ave (m/s)"].values
     winddir = wsdf["WindDir Ave (degrees)"].values
 
