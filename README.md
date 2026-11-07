@@ -18,7 +18,7 @@ Hourly meteorological observations from a **40-station automatic weather station
 | Temporal resolution | 1 hour |
 | Timestamp completeness | 99.77% network mean; 34/40 stations at 100% |
 | Variable completeness | 93.70% network mean over all station–variable pairs, after quality control (see `data_quality_assessment/`) |
-| Quality control | Rule-based; faulty values removed, and air temperatures above 37.0 °C flagged, all logged in `data_quality_assessment/qc_log.csv` |
+| Quality control | Rule-based; faulty values removed, rainfall scale corrected, and air temperatures above 37.0 °C flagged, all logged in `data_quality_assessment/qc_log.csv` |
 | Gap-filling | Two-stage, per variable: linear interpolation for short gaps + XGBoost spatial regression for longer gaps; every value flagged |
 | Formats | CSV (quality-controlled observations + gap-filled with flags); companion Python package |
 
@@ -36,7 +36,7 @@ nus-campus-weather-paper/
 │       └── NUS_CAMPUS_WS##_2025_Hourly_imputed.csv
 │
 ├── data_quality_assessment/
-│   ├── qc_log.csv                       # Every value removed or flagged by quality control, with rule, action and reason
+│   ├── qc_log.csv                       # Every value removed, corrected or flagged by quality control, with rule, action and reason
 │   ├── data_quality_summary.csv         # Timestamp and variable completeness per station
 │   ├── data_quality_network_summary.csv # Network-level completeness per variable
 │   ├── imputation_counts.csv            # Values per variable by flag (Stage 1 / Stage 2 / not imputed / observed above 37 °C)
@@ -106,7 +106,7 @@ Each variable gains a companion `_flag` column (e.g. `AirTemp_flag`), and rainfa
 
 ### ⚠️ Quality control and known issues
 
-`code/0_quality_control.py` removes faulty values from `data/raw/` and lists every removal (and every flagged value) in `data_quality_assessment/qc_log.csv`. The unmasked sensor values are preserved in release v1.0.0 (Zenodo [10.5281/zenodo.20477761](https://doi.org/10.5281/zenodo.20477761)). In total 32,236 values (1.5% of all hourly values) were removed:
+`code/0_quality_control.py` removes faulty values from `data/raw/`, corrects the rainfall scale, and lists every removal, correction and flagged value in `data_quality_assessment/qc_log.csv`. The unmasked sensor values are preserved in release v1.0.0 (Zenodo [10.5281/zenodo.20477761](https://doi.org/10.5281/zenodo.20477761)). In total 32,236 values of the six main variables (1.5%) were removed, together with 1,180 rainfall values (see below):
 
 - **Global irradiance, WS32 and WS39** — pyranometers non-functional (near-constant output with no diurnal cycle); whole year removed. Together with **WS38** (no pyranometer; fully shaded semi-outdoor site), these three stations have no irradiance data and are **not imputed** (flag 3).
 - **Global irradiance, WS07 (Sep–Dec), WS19 (Feb–Mar), WS23 (Mar–Sep), WS26 (May, Aug–Dec)** — corrupted channel (spurious night-time readings up to 1,500 W m⁻²); affected months removed. Isolated night-time readings above 20 W m⁻² removed elsewhere.
@@ -114,7 +114,8 @@ Each variable gains a companion `_flag` column (e.g. `AirTemp_flag`), and rainfa
 - **Wind, WS17 (December)** — anemometer malfunction: stalled records between 7 and 28 Dec, and implausible hourly means up to 17 m/s on 20–26 Dec; removed. Short runs of stalled wind records at WS01 and WS03 also removed.
 
 - **Rainfall, WS02, WS16, WS35** — the hourly aggregation stored 0 mm in the 1,180 hours in which the station recorded no other variable (536 h at WS02, 642 h at WS35, 2 h at WS16, mostly April–May). From v1.2.0 these values are missing (rule R1; `Rain_flag` = 3). Rainfall is not gap-filled.
-- **Daytime air temperature** — the naturally ventilated radiation shields read high in strong sunshine and light wind. The 294 hourly values above 37.0 °C (15 stations, 163 of them at WS22; all between 10:00 and 17:00) are kept and flagged 4 (rule T1). Other midday readings at ground stations in these conditions can also be biased high; treat daytime maxima, especially at WS22, as upper estimates.
+- **Rainfall amounts, WS02, WS16, WS35** — the loggers counted each tip of the 0.2-mm tipping bucket (LSI LASTEM DQA230.1) as 0.1 mm, so v1.0.0 and v1.1.0 hold half the true rainfall. From v1.2.0 all rainfall values are doubled (rule R2, action `corrected`). After the correction, annual totals over days recorded by both agree with the Meteorological Service Singapore gauge at Kent Ridge Road (S71) to within 2%, and daily totals correlate at r = 0.93–0.98.
+- **Daytime air temperature** — the naturally ventilated radiation shields read high in strong sunshine and light wind. The 294 hourly values above 37.0 °C (15 stations, 163 of them at WS22; all between 10:00 and 17:00) are kept and flagged 4 (rule T1). Other midday readings in these conditions, at ground and rooftop stations, can also be biased high; treat daytime maxima, especially at WS22, as upper estimates.
 
 Removed periods are then treated as ordinary gaps by the gap-filling pipeline (except the three irradiance stations above). The imputation procedure is described in the *Gap-filling methodology* section of the paper and implemented in `code/5_impute_missing_data.py`.
 

@@ -472,10 +472,10 @@ fig.text(0.50, 0.826,
          'Line = daily temp range  ·  Colour = daytime solar radiation (07–19h)  ·  Blob = rainfall (left) / relative humidity >82% (right)',
          color='#888888', fontsize=12, ha='center', va='top')
 
-rain_entries = [(rain_to_blob(5),  '5 mm'),
-                (rain_to_blob(20), '20 mm'),
-                (rain_to_blob(40), '40 mm'),
-                (rain_to_blob(80), '80 mm')]
+rain_entries = [(rain_to_blob(10),  '10 mm'),
+                (rain_to_blob(40),  '40 mm'),
+                (rain_to_blob(80),  '80 mm'),
+                (rain_to_blob(160), '160 mm')]
 rh_entries   = [(rh_to_blob(83),  '83%'),
                 (rh_to_blob(87),  '87%'),
                 (rh_to_blob(91),  '91%'),

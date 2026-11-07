@@ -5,7 +5,8 @@
 # Faulty values are set to missing (NaN) in data/raw/ and every removal is
 # written to data_quality_assessment/qc_log.csv (station, variable, period,
 # number of values, rule, action, reason). Rule T1 only flags values: they are
-# kept in data/raw/ and marked flag 4 in data/imputed/. The unmasked sensor
+# kept in data/raw/ and marked flag 4 in data/imputed/. Rule R2 corrects the
+# rainfall scale (action "corrected"). The unmasked sensor
 # values are preserved in release v1.0.0 of this repository
 # (Zenodo 10.5281/zenodo.20477761). Run this script on the v1.0.0 files.
 #
@@ -25,6 +26,12 @@
 #   R1  Rainfall during logger outages: the hourly aggregation stored 0 mm in
 #       hours in which the station recorded none of the other six variables;
 #       these rainfall values are set to missing (added in v1.2.0).
+#   R2  Rainfall doubled: the loggers counted each tip of the 0.2-mm tipping
+#       bucket (LSI LASTEM DQA230.1) as 0.1 mm, so the stored totals were half
+#       the true amount. After doubling, daily totals agree with the
+#       Meteorological Service Singapore gauge at Kent Ridge Road (S71). The
+#       rule is applied only to records still in 0.1-mm steps, so re-running
+#       the script does not double the values again (added in v1.2.0).
 #   T1  Air temperature above 37.0 C, Singapore's highest recorded
 #       temperature: value kept but flagged (flag 4 in data/imputed/), as it
 #       most likely includes radiation error of the naturally ventilated
@@ -133,6 +140,20 @@ for fpath in files:
                "Rainfall stored as 0 mm while the station recorded no other "
                "variable (logger outage)")
 
+        # Rainfall scale (R2): a 0.2-mm tipping bucket can only produce totals
+        # in 0.2-mm steps; totals in 0.1-mm steps mean each tip was logged as
+        # 0.1 mm.
+        r = df[RAIN]
+        tips = (r * 10).round()
+        if ((tips % 2) == 1).any():
+            sel = r.notna()
+            t = df.loc[sel, "Datetime"]
+            log.append(dict(Station=ws, Variable=RAIN, Start=t.min(), End=t.max(),
+                            N_values=int(sel.sum()), Rule="R2", Action="corrected",
+                            Reason="Values doubled: the logger counted each tip of the "
+                                   "0.2-mm tipping bucket as 0.1 mm"))
+            df[RAIN] = r * 2
+
     # ── Global irradiance ────────────────────────────────────────────────────
     g = df[RAD]
     if g.notna().sum() > 0:
@@ -202,4 +223,5 @@ print(f"\nValues removed: {rm['N_values'].sum():,} "
       f"({rm.loc[rm['Variable'] != RAIN, 'N_values'].sum():,} of the six variables, "
       f"{rm.loc[rm['Variable'] == RAIN, 'N_values'].sum():,} rainfall)")
 print(f"Values flagged : {qc.loc[qc['Action'] == 'flagged', 'N_values'].sum():,}")
+print(f"Values corrected: {qc.loc[qc['Action'] == 'corrected', 'N_values'].sum():,}")
 print(f"Log written to {log_path}")
