@@ -6,9 +6,9 @@
 # written to data_quality_assessment/qc_log.csv (station, variable, period,
 # number of values, rule, action, reason). Rule T1 only flags values: they are
 # kept in data/raw/ and marked flag 4 in data/imputed/. Rule R2 corrects the
-# rainfall scale (action "corrected"). The unmasked sensor
-# values are preserved in release v1.0.0 of this repository
-# (Zenodo 10.5281/zenodo.20477761). Run this script on the v1.0.0 files.
+# rainfall scale (action "corrected"). The unmasked sensor values are
+# preserved in release v1.0.0 of this repository (Zenodo
+# 10.5281/zenodo.20477761). Run this script on the v1.0.0 files.
 #
 # Rules
 #   G1  Global irradiance with no diurnal cycle (median daytime minus median

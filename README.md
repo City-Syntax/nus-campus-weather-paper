@@ -49,7 +49,7 @@ nus-campus-weather-paper/
 ├── figures/                             # Manuscript figures (Fig1–Fig10) + additional_figures/
 │
 ├── code/
-│   ├── 0_quality_control.py             # Removes faulty values → data/raw/, qc_log.csv
+│   ├── 0_quality_control.py             # Removes faulty values, corrects rainfall → data/raw/, qc_log.csv
 │   ├── 1_data_quality_check.py          # Completeness → data_quality_assessment/
 │   ├── 2_plot_data_completeness.py      # Fig 4
 │   ├── 3_plot_weather_data.py           # Fig 6, Fig 7, Fig 8
@@ -114,7 +114,7 @@ Each variable gains a companion `_flag` column (e.g. `AirTemp_flag`), and rainfa
 - **Wind, WS17 (December)** — anemometer malfunction: stalled records between 7 and 28 Dec, and implausible hourly means up to 17 m/s on 20–26 Dec; removed. Short runs of stalled wind records at WS01 and WS03 also removed.
 
 - **Rainfall, WS02, WS16, WS35** — the hourly aggregation stored 0 mm in the 1,180 hours in which the station recorded no other variable (536 h at WS02, 642 h at WS35, 2 h at WS16, mostly April–May). From v1.2.0 these values are missing (rule R1; `Rain_flag` = 3). Rainfall is not gap-filled.
-- **Rainfall amounts, WS02, WS16, WS35** — in v1.0.0 and v1.1.0 the rainfall is about half that at the nearby Meteorological Service Singapore gauges at Kent Ridge Road (S71) and South Buona Vista (S92), in every month and at all wind speeds, and the logged totals are in 0.1-mm steps although the gauges (LSI LASTEM DQA230.1) resolve 0.2 mm. Most likely each tip was logged as 0.1 mm. From v1.2.0 all rainfall values are doubled (rule R2, action `corrected`); annual totals then agree with S71 to within 2% and with S92 to within 10%, and daily totals correlate with S71 at r = 0.93–0.98. No correction is applied for wind-induced undercatch at these exposed rooftop sites.
+- **Rainfall amounts, WS02, WS16, WS35** — in v1.0.0 and v1.1.0 the rainfall is about half that at the nearby Meteorological Service Singapore gauges at Kent Ridge Road (S71) and South Buona Vista (S92) (49–55% of the annual totals, 40–72% in individual months, changing little with wind speed), and the logged totals are in 0.1-mm steps although the gauges (LSI LASTEM DQA230.1) resolve 0.2 mm. Most likely each tip was logged as 0.1 mm. From v1.2.0 all rainfall values are doubled (rule R2, action `corrected`); annual totals then agree with S71 to within 2% and with S92 to within 10%, and daily totals correlate with S71 at r = 0.93–0.98. No correction is applied for wind-induced undercatch at these exposed rooftop sites.
 - **Daytime air temperature** — the naturally ventilated radiation shields read high in strong sunshine and light wind. The 294 hourly values above 37.0 °C (15 stations, 163 of them at WS22; all between 10:00 and 17:00) are kept and flagged 4 (rule T1). Other midday readings in these conditions, at ground and rooftop stations, can also be biased high; treat daytime maxima, especially at WS22, as upper estimates.
 
 Removed periods are then treated as ordinary gaps by the gap-filling pipeline (except the three irradiance stations above). The imputation procedure is described in the *Gap-filling methodology* section of the paper and implemented in `code/5_impute_missing_data.py`.
