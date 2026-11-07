@@ -34,12 +34,10 @@ for fpath in FILES:
     # Duplicate timestamps
     n_dupes = df["Datetime"].duplicated().sum()
 
-    # Check for full hourly coverage gaps
-    if n_rows > 0:
-        full_range = pd.date_range(df["Datetime"].min(), df["Datetime"].max(), freq="h")
-        n_missing_ts = len(full_range) - df["Datetime"].nunique()
-    else:
-        n_missing_ts = EXPECTED_HOURS
+    # Hourly timestamps of 2025 with no row in the file (the raw files hold
+    # logged hours only; missing rows can sit at the start or end of the year)
+    full_range = pd.date_range("2025-01-01 00:00", "2025-12-31 23:00", freq="h")
+    n_missing_ts = int((~full_range.isin(df["Datetime"])).sum())
 
     rec = {
         "Station": ws,
@@ -51,10 +49,11 @@ for fpath in FILES:
 
     for col in DATA_COLS:
         if col in df.columns:
-            n_null = df[col].isna().sum()
-            pct_valid = round((n_rows - n_null) / EXPECTED_HOURS * 100, 2)
+            n_valid = int(df[col].notna().sum())
+            pct_valid = round(n_valid / EXPECTED_HOURS * 100, 2)
             short = col.split(" ")[0]  # WindSpeed, WindDir, AirTemp, RelHum, AtmPress, GlobalRad
-            rec[f"{short}_Missing"] = n_null
+            # Missing = hours of 2025 without a valid value (empty values plus missing rows)
+            rec[f"{short}_Missing"] = EXPECTED_HOURS - n_valid
             rec[f"{short}_Valid_%"] = pct_valid
 
     records.append(rec)

@@ -4,8 +4,10 @@
 #
 # Faulty values are set to missing (NaN) in data/raw/ and every removal is
 # written to data_quality_assessment/qc_log.csv (station, variable, period,
-# number of values, rule, reason). The unmasked sensor values are preserved in
-# release v1.0.0 of this repository (Zenodo 10.5281/zenodo.20477761).
+# number of values, rule, action, reason). Rule T1 only flags values: they are
+# kept in data/raw/ and marked flag 4 in data/imputed/. The unmasked sensor
+# values are preserved in release v1.0.0 of this repository
+# (Zenodo 10.5281/zenodo.20477761). Run this script on the v1.0.0 files.
 #
 # Rules
 #   G1  Global irradiance with no diurnal cycle (median daytime minus median
@@ -20,6 +22,13 @@
 #   W1  Stale wind records: wind speed and direction both unchanged for three
 #       or more consecutive hours (logger repeating the last reading).
 #   M1  Manually confirmed sensor malfunction (listed in MANUAL below).
+#   R1  Rainfall during logger outages: the hourly aggregation stored 0 mm in
+#       hours in which the station recorded none of the other six variables;
+#       these rainfall values are set to missing (added in v1.2.0).
+#   T1  Air temperature above 37.0 C, Singapore's highest recorded
+#       temperature: value kept but flagged (flag 4 in data/imputed/), as it
+#       most likely includes radiation error of the naturally ventilated
+#       shield under strong sunshine and light wind (added in v1.2.0).
 #
 # The script is idempotent: re-running it on already-cleaned files removes
 # nothing further. Run it once, before 1_data_quality_check.py.
@@ -37,6 +46,8 @@ os.makedirs(OUT_DIR, exist_ok=True)
 
 RAD, PRES = "GlobalRad Ave (W/m2)", "AtmPress Ave (hPa)"
 WS, WD = "WindSpeed Ave (m/s)", "WindDir Ave (degrees)"
+TA, RH, RAIN = "AirTemp Ave (C)", "RelHum Ave (%)", "Rain Tot (mm)"
+MET_VARS = [WS, WD, TA, RH, PRES, RAD]
 
 NIGHT_MAX = 20.0          # W m-2, G3
 MONTH_P95_MAX = 100.0     # W m-2, G2
@@ -44,6 +55,7 @@ RAD_MAX = 1200.0          # W m-2, G4
 DIURNAL_MIN = 50.0        # W m-2, G1
 PRES_RANGE = (950.0, 1050.0)
 STALE_HOURS = 3
+TA_SUSPECT = 37.0         # C, T1: Singapore's highest recorded temperature
 
 # Confirmed malfunctions found by inspection (M1)
 MANUAL = [
@@ -88,15 +100,16 @@ def runs_of(mask):
 log = []
 
 
-def remove(df, ws, var, sel, rule, reason):
+def remove(df, ws, var, sel, rule, reason, action="removed"):
     sel = sel & df[var].notna()
     n = int(sel.sum())
     if n == 0:
         return
     t = df.loc[sel, "Datetime"]
     log.append(dict(Station=ws, Variable=var, Start=t.min(), End=t.max(),
-                    N_values=n, Rule=rule, Reason=reason))
-    df.loc[sel, var] = np.nan
+                    N_values=n, Rule=rule, Action=action, Reason=reason))
+    if action == "removed":
+        df.loc[sel, var] = np.nan
 
 
 files = sorted(glob.glob(os.path.join(RAW_DIR, "NUS_CAMPUS_WS*_2025_Hourly.csv")))
@@ -111,6 +124,14 @@ for fpath in files:
     ts = pd.DatetimeIndex(df["Datetime"])
     night = pd.Series(night_mask(ts, lat, lon), index=df.index)
     month = df["Datetime"].dt.month
+
+    # ── Rainfall during logger outages (before the other rules, so that the
+    #    outage is judged on the original record) ──────────────────────────
+    if RAIN in df.columns:
+        outage = df[MET_VARS].isna().all(axis=1)
+        remove(df, ws, RAIN, outage, "R1",
+               "Rainfall stored as 0 mm while the station recorded no other "
+               "variable (logger outage)")
 
     # ── Global irradiance ────────────────────────────────────────────────────
     g = df[RAD]
@@ -155,16 +176,30 @@ for fpath in files:
         for v in vars_:
             remove(df, ws, v, sel, "M1", reason)
 
+    # ── Air temperature above the national record: flag only ────────────────
+    remove(df, ws, TA, df[TA] > TA_SUSPECT, "T1",
+           f"Air temperature above {TA_SUSPECT:.1f} C (Singapore's highest recorded "
+           "temperature); probable radiation error, value kept", action="flagged")
+
     df.to_csv(fpath, index=False)
 
 qc = pd.DataFrame(log, columns=["Station", "Variable", "Start", "End",
-                                "N_values", "Rule", "Reason"])
+                                "N_values", "Rule", "Action", "Reason"])
 log_path = os.path.join(OUT_DIR, "qc_log.csv")
-if os.path.exists(log_path) and qc.empty:
-    print("No further values removed (files already quality-controlled); "
-          "existing qc_log.csv kept.")
-else:
-    qc.to_csv(log_path, index=False)
-    print(qc.groupby(["Station", "Variable", "Rule"])["N_values"].sum().to_string())
-    print(f"\nTotal values removed: {qc['N_values'].sum():,}")
-    print(f"Log written to {log_path}")
+# Merge with an existing log, so that re-running the script on files that are
+# already quality-controlled keeps the record of earlier removals.
+if os.path.exists(log_path):
+    old = pd.read_csv(log_path, parse_dates=["Start", "End"])
+    if "Action" not in old.columns:
+        old.insert(old.columns.get_loc("Rule") + 1, "Action", "removed")
+    qc = pd.concat([old[qc.columns], qc], ignore_index=True)
+    qc = qc.drop_duplicates(subset=["Station", "Variable", "Start", "End", "Rule", "Action"],
+                            keep="first")
+qc.to_csv(log_path, index=False)
+print(qc.groupby(["Rule", "Action"])["N_values"].sum().to_string())
+rm = qc[qc["Action"] == "removed"]
+print(f"\nValues removed: {rm['N_values'].sum():,} "
+      f"({rm.loc[rm['Variable'] != RAIN, 'N_values'].sum():,} of the six variables, "
+      f"{rm.loc[rm['Variable'] == RAIN, 'N_values'].sum():,} rainfall)")
+print(f"Values flagged : {qc.loc[qc['Action'] == 'flagged', 'N_values'].sum():,}")
+print(f"Log written to {log_path}")

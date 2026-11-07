@@ -325,15 +325,16 @@ solar_r  = (hourly_r[hourly_r['Hour'].between(7,19)]
             .groupby('Date')['GlobalRad'].mean().rename('solar_day'))
 daily_rt = daily_rt.merge(solar_r, on='Date')
 
-# Rain: mean of 3 gauge stations
+# Rain: mean of the 3 gauge stations. A gauge-day counts only if all 24 hours
+# were recorded (rainfall is missing during logger outages; rule R1).
 dfs_rain = {}
-GAUGE_PATH = ROOT+'/data/imputed/NUS_CAMPUS_{ws}_2025_Hourly_imputed.csv'
+GAUGE_PATH = ROOT+'/data/raw/NUS_CAMPUS_{ws}_2025_Hourly.csv'
 for ws in GAUGE_STATIONS:
     d = pd.read_csv(GAUGE_PATH.format(ws=ws))
     d['Datetime'] = pd.to_datetime(d['Datetime'])
     d['Date']     = d['Datetime'].dt.date
     dfs_rain[ws]  = d
-rain_avg = (pd.concat([d.groupby('Date')['Rain Tot (mm)'].sum().rename(ws)
+rain_avg = (pd.concat([d.groupby('Date')['Rain Tot (mm)'].sum(min_count=24).rename(ws)
                         for ws, d in dfs_rain.items()], axis=1)
               .mean(axis=1).rename('rain'))
 

@@ -106,7 +106,7 @@ for ax, (ws, var, ctx_h, max_disp_h), panel in zip(axes, EXAMPLES, panel_labels)
             linestyle="--", alpha=0.85, zorder=2)
 
     # Observed — solid variable colour; NaN where not observed so line breaks at gap
-    obs_plot = obs_w.copy().where(fl_w == 0)
+    obs_plot = obs_w.copy().where(fl_w.isin([0, 4]))   # 4 = observed, flagged
     ax.plot(t, obs_plot, color=col_obs, lw=1.5, linestyle="-", zorder=3)
 
     ax.set_ylabel(VAR_LABEL[var], fontsize=8.5)

@@ -18,7 +18,7 @@ Hourly meteorological observations from a **40-station automatic weather station
 | Temporal resolution | 1 hour |
 | Timestamp completeness | 99.77% network mean; 34/40 stations at 100% |
 | Variable completeness | 93.70% network mean over all station–variable pairs, after quality control (see `data_quality_assessment/`) |
-| Quality control | Rule-based; faulty values removed and logged in `data_quality_assessment/qc_log.csv` |
+| Quality control | Rule-based; faulty values removed, and air temperatures above 37.0 °C flagged, all logged in `data_quality_assessment/qc_log.csv` |
 | Gap-filling | Two-stage, per variable: linear interpolation for short gaps + XGBoost spatial regression for longer gaps; every value flagged |
 | Formats | CSV (quality-controlled observations + gap-filled with flags); companion Python package |
 
@@ -30,16 +30,16 @@ Hourly meteorological observations from a **40-station automatic weather station
 nus-campus-weather-paper/
 │
 ├── data/
-│   ├── raw/                             # Quality-controlled observations (40 CSV files)
+│   ├── raw/                             # Quality-controlled observations (40 CSV files, logged hours only)
 │   │   └── NUS_CAMPUS_WS##_2025_Hourly.csv
-│   └── imputed/                         # Gap-filled dataset (40 CSV files + flag columns)
+│   └── imputed/                         # Gap-filled dataset (40 CSV files, 8,760 h each, + flag columns)
 │       └── NUS_CAMPUS_WS##_2025_Hourly_imputed.csv
 │
 ├── data_quality_assessment/
-│   ├── qc_log.csv                       # Every value removed by quality control, with rule and reason
+│   ├── qc_log.csv                       # Every value removed or flagged by quality control, with rule, action and reason
 │   ├── data_quality_summary.csv         # Timestamp and variable completeness per station
 │   ├── data_quality_network_summary.csv # Network-level completeness per variable
-│   ├── imputation_counts.csv            # Values filled per variable (Stage 1 / Stage 2 / not imputed)
+│   ├── imputation_counts.csv            # Values per variable by flag (Stage 1 / Stage 2 / not imputed / observed above 37 °C)
 │   ├── imputation_evaluation.csv        # Leave-one-station-out validation, per station and gap length
 │   ├── imputation_evaluation_summary.csv
 │   ├── stage1_validation.csv            # Linear interpolation vs XGBoost on identical short gaps
@@ -58,7 +58,7 @@ nus-campus-weather-paper/
 │   ├── 6_plot_imputation_examples.py    # Fig 10
 │   └── preprocessing/                   # Historical only — not needed for re-use
 │
-├── requirements.txt                     # Package versions used for release v1.1.0
+├── requirements.txt                     # Package versions used for the release
 ├── LICENSE              # Pointer — repo is dual-licensed (see below)
 ├── LICENSE-CODE         # MIT — applies to code/ and scripts
 ├── LICENSE-DATA         # CC BY 4.0 — applies to data/, data_quality_assessment/, figures/
@@ -88,31 +88,33 @@ Figures 1–3 (photos and maps) are static image files. Figure 8 (wind-rose map)
 | `GlobalRad Ave (W/m2)` | W m⁻² | Hourly mean global horizontal irradiance at the sensor, including shading by nearby buildings and vegetation (not equivalent to unobstructed GHI) |
 | `Rain Tot (mm)` | mm | Hourly rainfall total *(WS02, WS16, WS35 only)* |
 
-Missing values are empty cells (`NaN` in pandas).
+Missing values are empty cells (`NaN` in pandas). The raw files hold one row for each hour the station logged: six stations lack 810 hourly rows in total, mostly at the end of December (WS06 317, WS38 435, WS17 43, WS31 12, WS20 2, WS30 1; see `Missing_Timestamps` in `data_quality_summary.csv`). The gap-filled files cover all 8,760 hours of 2025.
 
 ### Gap-filled CSV — flag columns
 
-Each variable gains a companion `_flag` column (e.g. `AirTemp_flag`):
+Each variable gains a companion `_flag` column (e.g. `AirTemp_flag`), and rainfall has `Rain_flag` at WS02, WS16 and WS35:
 
 | Flag | Meaning |
 |---|---|
 | `0` | Original observation |
 | `1` | Stage 1 — linear interpolation (short gap, variable-specific limit) |
 | `2` | Stage 2 — XGBoost spatial regression |
-| `3` | Not measured / not imputed — left empty |
+| `3` | Not measured / not imputed — left empty (rainfall is never gap-filled) |
+| `4` | Original air-temperature observation above 37.0 °C (Singapore's highest recorded temperature) — kept, but probably includes radiation error (rule T1) |
 
-> To use only original data, keep rows where the flag is 0, or use `observed_only=True` in the Python package.
+> To use only original data, keep rows where the flag is 0 (or 4 for air temperature), or use `observed_only=True` in the Python package.
 
 ### ⚠️ Quality control and known issues
 
-`code/0_quality_control.py` removes faulty values from `data/raw/` and lists every removal in `data_quality_assessment/qc_log.csv`. The unmasked sensor values are preserved in release v1.0.0 (Zenodo [10.5281/zenodo.20477761](https://doi.org/10.5281/zenodo.20477761)). In total 32,236 values (1.5% of all hourly values) were removed:
+`code/0_quality_control.py` removes faulty values from `data/raw/` and lists every removal (and every flagged value) in `data_quality_assessment/qc_log.csv`. The unmasked sensor values are preserved in release v1.0.0 (Zenodo [10.5281/zenodo.20477761](https://doi.org/10.5281/zenodo.20477761)). In total 32,236 values (1.5% of all hourly values) were removed:
 
 - **Global irradiance, WS32 and WS39** — pyranometers non-functional (near-constant output with no diurnal cycle); whole year removed. Together with **WS38** (no pyranometer; fully shaded semi-outdoor site), these three stations have no irradiance data and are **not imputed** (flag 3).
 - **Global irradiance, WS07 (Sep–Dec), WS19 (Feb–Mar), WS23 (Mar–Sep), WS26 (May, Aug–Dec)** — corrupted channel (spurious night-time readings up to 1,500 W m⁻²); affected months removed. Isolated night-time readings above 20 W m⁻² removed elsewhere.
 - **Atmospheric pressure, WS17 (Jan–Apr)** — sensor fault (readings of 460–478 hPa); removed. Values from June onward are valid.
 - **Wind, WS17 (December)** — anemometer malfunction: stalled records between 7 and 28 Dec, and implausible hourly means up to 17 m/s on 20–26 Dec; removed. Short runs of stalled wind records at WS01 and WS03 also removed.
 
-- **Rainfall, WS02, WS16, WS35** — the rain column reads 0 mm in the 1,180 hours in which the station recorded no other variable (536 h at WS02, 642 h at WS35, 2 h at WS16, mostly April–May). These hours are station outages; treat their rainfall as missing.
+- **Rainfall, WS02, WS16, WS35** — the hourly aggregation stored 0 mm in the 1,180 hours in which the station recorded no other variable (536 h at WS02, 642 h at WS35, 2 h at WS16, mostly April–May). From v1.2.0 these values are missing (rule R1; `Rain_flag` = 3). Rainfall is not gap-filled.
+- **Daytime air temperature** — the naturally ventilated radiation shields read high in strong sunshine and light wind. The 294 hourly values above 37.0 °C (15 stations, 163 of them at WS22; all between 10:00 and 17:00) are kept and flagged 4 (rule T1). Other midday readings at ground stations in these conditions can also be biased high; treat daytime maxima, especially at WS22, as upper estimates.
 
 Removed periods are then treated as ordinary gaps by the gap-filling pipeline (except the three irradiance stations above). The imputation procedure is described in the *Gap-filling methodology* section of the paper and implemented in `code/5_impute_missing_data.py`.
 
@@ -184,7 +186,7 @@ python code/5_impute_missing_data.py       # → data/imputed/, data_quality_ass
 python code/6_plot_imputation_examples.py  # → figures/Fig10
 ```
 
-`0_quality_control.py` is idempotent; starting from the v1.0.0 files reproduces the cleaned files exactly. XGBoost results can differ slightly between library versions; `requirements.txt` lists the versions used for this release.
+`0_quality_control.py` is idempotent; starting from the v1.0.0 files it reproduces the cleaned values and the log exactly (the `Type` and `Elevation (m)` columns were added to the files for v1.1.0). XGBoost results can differ slightly between library versions; `requirements.txt` lists the versions used for this release.
 
 ---
 

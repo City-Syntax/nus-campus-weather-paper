@@ -51,7 +51,12 @@
 #
 # FLAGS
 #   0 = original observation, 1 = Stage 1 linear interpolation,
-#   2 = Stage 2 XGBoost spatial regression, 3 = not measured / not imputed.
+#   2 = Stage 2 XGBoost spatial regression, 3 = not measured / not imputed,
+#   4 = original observation above 37.0 C (air temperature only; Singapore's
+#       highest recorded temperature, probable radiation error; rule T1 in
+#       0_quality_control.py).
+#   Rainfall (WS02, WS16, WS35) is not gap-filled: Rain_flag is 0 where
+#   observed and 3 where missing.
 #
 # NOT IMPUTED (flag 3)
 #   Station-variables with less than MIN_VALID_FRACTION of the year observed
@@ -93,6 +98,8 @@ N_BLOCKS           = 5        # non-overlapping synthetic gaps per (station × l
 SHORT_BLOCKS       = [1, 2, 3, 6, 12, 24]                        # Stage 1 validation (h)
 N_BLOCKS_SHORT     = 40       # gaps per (station × length) for Stage 1 validation
 MIN_VALID_FRACTION = 0.10     # below this, a station-variable is not imputed (flag 3)
+TA_SUSPECT = 37.0             # C, observed air temperature above this gets flag 4
+RAIN = "Rain Tot (mm)"        # rainfall is passed through without gap filling
 RANDOM_SEED        = 42
 
 rng       = np.random.default_rng(RANDOM_SEED)       # LOSO (Table 7)
@@ -609,26 +616,39 @@ if not any_warning:
 print(f"\n{'=' * 70}")
 print(f"Saving imputed CSVs to {OUT_DIR}/ …")
 
+# Flag 4: observed air temperature above the national record (kept, flagged)
+TA = "AirTemp Ave (C)"
+s4_counts = {TA: 0}
+for ws in stations:
+    hot = (flag_pivots[TA][ws] == 0) & (final_pivots[TA][ws] > TA_SUSPECT)
+    flag_pivots[TA].loc[hot, ws] = 4
+    s4_counts[TA] += int(hot.sum())
+
 for ws in stations:
     df_out = raw[ws].copy()
     # Restore metadata that became NaN on rows added during reindex
     df_out["Latitude"]  = meta[ws]["lat"]
     df_out["Longitude"] = meta[ws]["lon"]
     for col in df_out.columns:
-        if col not in ALL_VARS + ["Latitude", "Longitude"]:
+        if col not in ALL_VARS + ["Latitude", "Longitude", RAIN]:
             df_out[col] = df_out[col].ffill().bfill()
 
     for v in ALL_VARS:
         df_out[v] = final_pivots[v][ws]
-        # Flag: 0=original, 1=Stage1 linear interp, 2=Stage2 XGBoost, 3=not imputed
+        # Flag: 0=original, 1=Stage1 linear, 2=Stage2 XGBoost, 3=not imputed, 4=observed >37 C
         df_out[FLAG_COL[v]] = flag_pivots[v][ws].values
+
+    if RAIN in df_out.columns:
+        # Rainfall is not gap-filled: 0 = observed, 3 = missing
+        df_out["Rain_flag"] = np.where(df_out[RAIN].notna(), 0, 3).astype(np.int8)
 
     df_out.index.name = "Datetime"
     out_path = os.path.join(OUT_DIR, f"NUS_CAMPUS_{ws}_2025_Hourly_imputed.csv")
     df_out.to_csv(out_path)
 
 print(f"  Saved {len(stations)} files.")
-print(f"  Flag column values: 0=original, 1=Stage1 linear, 2=Stage2 XGBoost, 3=not imputed")
+print(f"  Flag column values: 0=original, 1=Stage1 linear, 2=Stage2 XGBoost, 3=not imputed, "
+      f"4=original above {TA_SUSPECT:.1f} C")
 
 # ── Save evaluation and plausibility tables ────────────────────────────────
 eval_path  = os.path.join(RESULT_DIR, "imputation_evaluation.csv")
@@ -654,6 +674,7 @@ counts = pd.DataFrame({
     "Stage1_linear": [s1_counts[v] for v in ALL_VARS],
     "Stage2_xgboost": [s2_counts[v] for v in ALL_VARS],
     "Not_imputed_flag3": [s3_counts[v] for v in ALL_VARS],
+    "Observed_flag4": [s4_counts.get(v, 0) for v in ALL_VARS],
 })
 counts.to_csv(os.path.join(RESULT_DIR, "imputation_counts.csv"), index=False)
 
