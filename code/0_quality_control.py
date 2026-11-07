@@ -26,12 +26,13 @@
 #   R1  Rainfall during logger outages: the hourly aggregation stored 0 mm in
 #       hours in which the station recorded none of the other six variables;
 #       these rainfall values are set to missing (added in v1.2.0).
-#   R2  Rainfall doubled: the loggers counted each tip of the 0.2-mm tipping
-#       bucket (LSI LASTEM DQA230.1) as 0.1 mm, so the stored totals were half
-#       the true amount. After doubling, daily totals agree with the
-#       Meteorological Service Singapore gauge at Kent Ridge Road (S71). The
-#       rule is applied only to records still in 0.1-mm steps, so re-running
-#       the script does not double the values again (added in v1.2.0).
+#   R2  Rainfall doubled: the logged totals are in 0.1-mm steps although the
+#       gauge (LSI LASTEM DQA230.1) resolves 0.2 mm, and they are about half
+#       those at the Meteorological Service Singapore gauges at Kent Ridge Road
+#       (S71) and South Buona Vista (S92), most likely because each tip was
+#       logged as 0.1 mm. After doubling, annual totals agree with S71 to within
+#       2%. The rule is applied only to records still in 0.1-mm steps, so
+#       re-running the script does not double the values again (added in v1.2.0).
 #   T1  Air temperature above 37.0 C, Singapore's highest recorded
 #       temperature: value kept but flagged (flag 4 in data/imputed/), as it
 #       most likely includes radiation error of the naturally ventilated
@@ -141,8 +142,8 @@ for fpath in files:
                "variable (logger outage)")
 
         # Rainfall scale (R2): a 0.2-mm tipping bucket can only produce totals
-        # in 0.2-mm steps; totals in 0.1-mm steps mean each tip was logged as
-        # 0.1 mm.
+        # in 0.2-mm steps; totals in 0.1-mm steps indicate that each tip was
+        # logged as 0.1 mm.
         r = df[RAIN]
         tips = (r * 10).round()
         if ((tips % 2) == 1).any():
@@ -150,9 +151,10 @@ for fpath in files:
             t = df.loc[sel, "Datetime"]
             log.append(dict(Station=ws, Variable=RAIN, Start=t.min(), End=t.max(),
                             N_values=int(sel.sum()), Rule="R2", Action="corrected",
-                            Reason="Values doubled: the logger counted each tip of the "
-                                   "0.2-mm tipping bucket as 0.1 mm"))
-            df[RAIN] = r * 2
+                            Reason="Values doubled: totals in 0.1-mm steps from a 0.2-mm "
+                                   "tipping bucket and about half those at nearby MSS gauges; "
+                                   "each tip most likely logged as 0.1 mm"))
+            df[RAIN] = (r * 2).round(1)   # 0.2-mm steps; drops float noise of the hourly sums
 
     # ── Global irradiance ────────────────────────────────────────────────────
     g = df[RAD]

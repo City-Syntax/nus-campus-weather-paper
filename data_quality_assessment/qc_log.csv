@@ -3,7 +3,7 @@ WS01,WindSpeed Ave (m/s),2025-09-13 23:00:00,2025-09-14 01:00:00,3,W1,removed,Wi
 WS01,WindDir Ave (degrees),2025-09-13 23:00:00,2025-09-14 01:00:00,3,W1,removed,Wind speed and direction unchanged for >= 3 h (stale record)
 WS01,AirTemp Ave (C),2025-05-24 15:00:00,2025-08-02 16:00:00,4,T1,flagged,"Air temperature above 37.0 C (Singapore's highest recorded temperature); probable radiation error, value kept"
 WS02,Rain Tot (mm),2025-04-05 20:00:00,2025-05-07 10:00:00,536,R1,removed,Rainfall stored as 0 mm while the station recorded no other variable (logger outage)
-WS02,Rain Tot (mm),2025-01-01 00:00:00,2025-12-31 23:00:00,8224,R2,corrected,Values doubled: the logger counted each tip of the 0.2-mm tipping bucket as 0.1 mm
+WS02,Rain Tot (mm),2025-01-01 00:00:00,2025-12-31 23:00:00,8224,R2,corrected,Values doubled: totals in 0.1-mm steps from a 0.2-mm tipping bucket and about half those at nearby MSS gauges; each tip most likely logged as 0.1 mm
 WS03,WindSpeed Ave (m/s),2025-06-19 18:00:00,2025-10-31 05:00:00,7,W1,removed,Wind speed and direction unchanged for >= 3 h (stale record)
 WS03,WindDir Ave (degrees),2025-06-19 18:00:00,2025-10-31 05:00:00,7,W1,removed,Wind speed and direction unchanged for >= 3 h (stale record)
 WS03,AirTemp Ave (C),2025-06-15 14:00:00,2025-06-15 15:00:00,2,T1,flagged,"Air temperature above 37.0 C (Singapore's highest recorded temperature); probable radiation error, value kept"
@@ -18,7 +18,7 @@ WS07,AirTemp Ave (C),2025-05-07 12:00:00,2025-06-15 13:00:00,2,T1,flagged,"Air t
 WS08,AirTemp Ave (C),2025-06-15 14:00:00,2025-06-15 14:00:00,1,T1,flagged,"Air temperature above 37.0 C (Singapore's highest recorded temperature); probable radiation error, value kept"
 WS10,AirTemp Ave (C),2025-02-14 12:00:00,2025-04-30 14:00:00,3,T1,flagged,"Air temperature above 37.0 C (Singapore's highest recorded temperature); probable radiation error, value kept"
 WS16,Rain Tot (mm),2025-12-20 01:00:00,2025-12-27 23:00:00,2,R1,removed,Rainfall stored as 0 mm while the station recorded no other variable (logger outage)
-WS16,Rain Tot (mm),2025-01-01 00:00:00,2025-12-31 23:00:00,8758,R2,corrected,Values doubled: the logger counted each tip of the 0.2-mm tipping bucket as 0.1 mm
+WS16,Rain Tot (mm),2025-01-01 00:00:00,2025-12-31 23:00:00,8758,R2,corrected,Values doubled: totals in 0.1-mm steps from a 0.2-mm tipping bucket and about half those at nearby MSS gauges; each tip most likely logged as 0.1 mm
 WS17,AtmPress Ave (hPa),2025-01-01 00:00:00,2025-04-30 11:00:00,2868,P1,removed,Pressure outside 950-1050 hPa (sensor fault)
 WS17,WindSpeed Ave (m/s),2025-12-07 14:00:00,2025-12-28 12:00:00,163,W1,removed,Wind speed and direction unchanged for >= 3 h (stale record)
 WS17,WindDir Ave (degrees),2025-12-07 14:00:00,2025-12-28 12:00:00,163,W1,removed,Wind speed and direction unchanged for >= 3 h (stale record)
@@ -48,7 +48,7 @@ WS31,AirTemp Ave (C),2025-05-28 16:00:00,2025-05-28 16:00:00,1,T1,flagged,"Air t
 WS32,GlobalRad Ave (W/m2),2025-01-01 00:00:00,2025-12-31 23:00:00,7836,G1,removed,No diurnal cycle (day-night median difference -3 W m-2); pyranometer non-functional
 WS34,AirTemp Ave (C),2025-03-03 15:00:00,2025-08-02 16:00:00,29,T1,flagged,"Air temperature above 37.0 C (Singapore's highest recorded temperature); probable radiation error, value kept"
 WS35,Rain Tot (mm),2025-01-13 06:00:00,2025-12-18 06:00:00,642,R1,removed,Rainfall stored as 0 mm while the station recorded no other variable (logger outage)
-WS35,Rain Tot (mm),2025-01-01 00:00:00,2025-12-31 23:00:00,8118,R2,corrected,Values doubled: the logger counted each tip of the 0.2-mm tipping bucket as 0.1 mm
+WS35,Rain Tot (mm),2025-01-01 00:00:00,2025-12-31 23:00:00,8118,R2,corrected,Values doubled: totals in 0.1-mm steps from a 0.2-mm tipping bucket and about half those at nearby MSS gauges; each tip most likely logged as 0.1 mm
 WS35,GlobalRad Ave (W/m2),2025-02-07 21:00:00,2025-02-07 21:00:00,1,G3,removed,Night-time irradiance above 20 W m-2
 WS36,AirTemp Ave (C),2025-10-30 15:00:00,2025-10-30 15:00:00,1,T1,flagged,"Air temperature above 37.0 C (Singapore's highest recorded temperature); probable radiation error, value kept"
 WS39,GlobalRad Ave (W/m2),2025-01-01 00:00:00,2025-12-31 23:00:00,8658,G1,removed,No diurnal cycle (day-night median difference -17 W m-2); pyranometer non-functional
